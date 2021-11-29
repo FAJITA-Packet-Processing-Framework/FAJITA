@@ -63,7 +63,7 @@ class FastUDPFlows : public BatchElement {
 
         const char *class_name() const override  { return "FastUDPFlows"; }
         const char *port_count() const override  { return PORTS_0_1; }
-        const char *processing() const override  { return PULL; }
+        const char *processing() const override  { return AGNOSTIC; }
 
         int configure(Vector<String> &, ErrorHandler *) CLICK_COLD;
         int initialize(ErrorHandler *) CLICK_COLD;
@@ -73,6 +73,9 @@ class FastUDPFlows : public BatchElement {
     #if HAVE_BATCH
         PacketBatch *pull_batch(int port, unsigned max);
     #endif
+
+
+        bool run_task(Task*);
 
         void cleanup_flows();
         static int length_write_handler (const String &s, Element *e, void *, ErrorHandler *errh);
@@ -92,6 +95,7 @@ class FastUDPFlows : public BatchElement {
         bool _stop;
 
     private:
+
         bool _rate_limited;
         unsigned _len;
         click_ether _ethh;
@@ -99,16 +103,26 @@ class FastUDPFlows : public BatchElement {
         struct in_addr _dipaddr;
         unsigned int _nflows;
         unsigned int _flowsize;
+        unsigned int _flowburst;
         bool _cksum;
         bool _sequential;
         click_jiffies_t _first;
         click_jiffies_t _last;
-        per_thread<unsigned> _last_flow;
+        struct state_t {
+            state_t() : index(0), count(-1) {
+
+            }
+            unsigned index;
+            unsigned count;
+        };
+        per_thread<state_t> _last_flow;
         struct flow_t {
             Packet *packet;
             unsigned flow_count;
         };
         flow_t *_flows;
+        Task _task;
+        Timer _timer;
 
         void change_ports(int);
         Packet *get_packet();
