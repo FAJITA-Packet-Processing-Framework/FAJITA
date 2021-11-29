@@ -75,15 +75,15 @@ tagain:
     // Other pushers spin until _tail := nt (or _xtail := t)
 
     Storage::index_type h = head();
-    if (nt != h)
-	push_success(h, t, nt, p);
+    if (likely(nt != h))
+	    push_success(h, t, nt, p);
     else {
-	_xtail = t;
-    if (unlikely(_blocking)) {
-        click_relax_fence();
-        goto tagain;
-    }
-	push_failure(p);
+        _xtail = t;
+        if (unlikely(_blocking && router()->running())) {
+            click_relax_fence();
+            goto tagain;
+        }
+        push_failure(p);
     }
 }
 
