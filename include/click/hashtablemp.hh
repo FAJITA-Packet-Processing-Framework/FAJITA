@@ -1047,6 +1047,7 @@ class AgingTableMP {
 	inline size_type size() {
 		return _table.size();
 	}
+
 };
 
 template <typename K, typename Vin, typename Time = click_jiffies_t>

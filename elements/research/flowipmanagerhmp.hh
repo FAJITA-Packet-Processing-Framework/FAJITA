@@ -60,6 +60,7 @@ class FlowIPManagerHMP: public VirtualFlowManager, Router::InitFuture {
         int _table_size;
         int _flow_state_size_full;
         int _verbose;
+        bool _cache;
 };
 
 CLICK_ENDDECLS

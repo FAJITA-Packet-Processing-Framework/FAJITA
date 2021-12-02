@@ -130,7 +130,7 @@ FlowIPManager_CuckooPP::process(Packet *p, BatchBuilder &b, Timestamp &recent) {
         uint32_t flowid;
         flowid = state.imp_flows_pop();
         if (unlikely(flowid == 0)) {
-            click_chatter("ID is 0 and table is full!");
+            click_chatter("%p{element}: ID is 0 and table is full!", this);
             p->kill();
             return;
         }
@@ -139,6 +139,8 @@ FlowIPManager_CuckooPP::process(Packet *p, BatchBuilder &b, Timestamp &recent) {
         ret = insert(fid, flowid);
 
         if (unlikely(ret == 0)) {
+            click_chatter("%p{element}: Could not insert flow!", this);
+            state.imp_flows_push(flowid);
             p->kill();
             return;
         }

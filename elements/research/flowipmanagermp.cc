@@ -44,7 +44,7 @@ FlowIPManagerMP::alloc(int core)
 
         VPRINT(1,"[%i] Real capacity for table will be %lu", core,  _table_size);
 
-        sprintf(buf, "MP-%i", core);
+        sprintf(buf, "%i-%s", core, name().c_str());
         _tables[0].hash = rte_hash_create(&hash_params);
 
         if(unlikely(_tables[0].hash == nullptr))

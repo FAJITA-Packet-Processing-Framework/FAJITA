@@ -710,7 +710,8 @@ inline void VFIM_CLASS::process(Packet *p, BatchBuilder &b, Timestamp &recent,
         b.init();
         b.append(p);
         b.last = ret;
-        if (_cache) b.last_id = fid;
+        if (_cache)
+            b.last_id = fid;
         DBG_PRINT();
     }
     CYCLES_PROCESS_END

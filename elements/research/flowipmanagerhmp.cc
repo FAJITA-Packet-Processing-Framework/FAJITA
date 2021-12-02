@@ -42,6 +42,7 @@ FlowIPManagerHMP::configure(Vector<String> &conf, ErrorHandler *errh)
             .read_or_set_p("CAPACITY", _table_size, 65536)
             .read_or_set("RESERVE", _reserve, 0)
             .read_or_set("VERBOSE", _verbose, 0)
+            .read_or_set("CACHE", _cache, 1)
             .complete() < 0)
         return -1;
 
@@ -67,6 +68,8 @@ int FlowIPManagerHMP::solve_initialize(ErrorHandler *errh)
 
     _hash.resize_clear(_table_size);
 
+    click_chatter("%p{element}: Real table size will be %d",this, _hash.size());
+
     fcbs =  (FlowControlBlock*)CLICK_ALIGNED_ALLOC(_flow_state_size_full * _table_size);
     bzero(fcbs,_flow_state_size_full * _table_size);
     CLICK_ASSERT_ALIGNED(fcbs);
@@ -91,6 +94,11 @@ void FlowIPManagerHMP::post_migrate(DPDKDevice* dev, int from)
 void FlowIPManagerHMP::process(Packet* p, BatchBuilder& b)
 {
     IPFlow5ID fid = IPFlow5ID(p);
+
+    if (_cache && fid == b.last_id) {
+        b.append(p);
+        return;
+    }
     bool first = false;
 
     auto ptr = _hash.find_create(fid, [this,&first](){
@@ -112,6 +120,8 @@ void FlowIPManagerHMP::process(Packet* p, BatchBuilder& b)
             output_push_batch(0, batch);
         }
         fcb_stack = (FlowControlBlock*)((unsigned char*)fcbs + _flow_state_size_full * ret);
+        if (_cache)
+            b.last_id = fid;
         b.init();
         b.append(p);
     }
@@ -151,12 +161,12 @@ FlowIPManagerHMP::read_handler(Element *e, void *thunk) {
 
     intptr_t cnt = (intptr_t)thunk;
     switch (cnt) {
-    /*case h_count: the HashTableMP has no counter
-        return String(f->_hash.count());*/
+    case h_count:
+        return String(f->_hash.size());
     case h_capacity:
-        return String(f->_table_size);
+        return String(f->_hash.buckets());
     case h_total_capacity:
-        return String(f->_table_size);
+        return String(f->_hash.buckets());
     default:
         return "<error>";
     }

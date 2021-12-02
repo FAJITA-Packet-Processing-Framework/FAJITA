@@ -32,7 +32,7 @@ FlowIPManagerIMP::alloc(int core)
     VPRINT(1,"[%i] Real capacity for table will be %lu", core, _table_size);
 
 
-    sprintf(buf, "IMP-%d", core);
+    sprintf(buf, "%d-%s", core, name().c_str());
     _tables[core].hash = rte_hash_create(&hash_params);
 
     if(unlikely(_tables[core].hash == nullptr))

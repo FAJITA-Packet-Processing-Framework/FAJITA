@@ -116,7 +116,7 @@ FastUDPFlows::get_packet()
 {
     int flow;
     if (_last_flow->count++ < _flowburst) {
-        flow = _last_flow->index;
+        flow = _last_flow->index % _nflows;
     } else {
         flow = (_sequential?(_last_flow->index)++ : (click_random() >> 2)) % _nflows;
         _last_flow->count = 1;

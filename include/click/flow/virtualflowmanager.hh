@@ -64,12 +64,13 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
         _tables.compress(passing);
 
         click_chatter("Real capacity for each table will be %d", _capacity);
+        _reserve += sizeof(uint32_t);
+        if (_timeout)
+            _reserve+= sizeof(IPFlow5ID);
         _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
 
         for (int ui = 0; ui < _tables.weight(); ui++) {
             
-
-
             auto &t = _tables.get_value(ui);
             int core = _tables.get_mapping(ui);
 
@@ -81,7 +82,7 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
                 t._timer_wheel.initialize(_timeout * _epochs_per_sec);
             }
 
-            t.fcbs =  (FlowControlBlock*)CLICK_ALIGNED_ALLOC(_flow_state_size_full * _capacity);
+            t.fcbs = (FlowControlBlock*)CLICK_ALIGNED_ALLOC(_flow_state_size_full * _capacity);
             CLICK_ASSERT_ALIGNED(t.fcbs);
             bzero(t.fcbs,_flow_state_size_full * _capacity);
             if (!t.fcbs) {
