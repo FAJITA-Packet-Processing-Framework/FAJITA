@@ -75,7 +75,8 @@ class FastUDPFlows : public BatchElement {
     #endif
 
 
-        bool run_task(Task*);
+        bool run_task(Task*) override;
+        void run_timer(Timer*) override;
 
         void cleanup_flows();
         static int length_write_handler (const String &s, Element *e, void *, ErrorHandler *errh);
@@ -109,11 +110,11 @@ class FastUDPFlows : public BatchElement {
         click_jiffies_t _first;
         click_jiffies_t _last;
         struct state_t {
-            state_t() : index(0), count(-1) {
+            state_t() : index(0), burst_count(1) {
 
             }
             unsigned index;
-            unsigned count;
+            unsigned burst_count;
         };
         per_thread<state_t> _last_flow;
         struct flow_t {
