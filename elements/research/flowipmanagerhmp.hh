@@ -2,7 +2,6 @@
 #define CLICK_FLOWIPMANAGERHMP_HH
 #include <click/config.h>
 #include <click/string.hh>
-#include <click/timer.hh>
 #include <click/vector.hh>
 #include <click/multithread.hh>
 #include <click/batchelement.hh>
@@ -11,7 +10,6 @@
 #include <click/ipflowid.hh>
 #include <click/flow/flowelement.hh>
 #include <click/flow/common.hh>
-#include <click/timerwheel.hh>
 
 #include "../research/flowipmanager.hh"
 
@@ -46,9 +44,9 @@ class FlowIPManagerHMP: public VirtualFlowManager, Router::InitFuture {
 
         void init_assignment(Vector<unsigned> table) CLICK_COLD;
 
-        static String read_handler(Element *e, void *thunk);
+        virtual int count() override;
 
-        void add_handlers() override CLICK_COLD;
+        virtual int capacity() override;
     private:
         HashTableMP<IPFlow5ID,int> _hash;
         atomic_uint32_t _current;

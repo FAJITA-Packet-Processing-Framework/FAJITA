@@ -69,7 +69,7 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 #endif
 
-    _reserve += sizeof(IPFlow5ID)  + sizeof(FlowControlBlock);
+    _reserve += sizeof(IPFlow5ID);
 
     return 0;
 }
@@ -85,8 +85,8 @@ int FlowIPManager::solve_initialize(ErrorHandler *errh)
     hash_params.hash_func_init_val = 0;
     hash_params.extra_flag = _flags;
 
-    assert(_reserve >=  sizeof(IPFlow5ID) + sizeof(FlowControlBlock));
-    _flow_state_size_full = _reserve;
+    assert(_reserve >=  sizeof(IPFlow5ID));
+    _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
 
     if (_verbose)
      errh->message("Per-flow size is %d", _reserve);
@@ -217,7 +217,8 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
     }
 }
 
-void FlowIPManager::push_batch(int, PacketBatch* batch)
+void
+FlowIPManager::push_batch(int, PacketBatch* batch)
 {
     BatchBuilder b;
     Timestamp recent = Timestamp::recent_steady();
@@ -235,24 +236,18 @@ void FlowIPManager::push_batch(int, PacketBatch* batch)
     }
 }
 
-enum {h_count};
-String FlowIPManager::read_handler(Element* e, void* thunk)
+int
+FlowIPManager::count()
 {
-    FlowIPManager* fc = static_cast<FlowIPManager*>(e);
-
-    rte_hash* table = fc->hash;
-    switch ((intptr_t)thunk) {
-    case h_count:
-        return String(rte_hash_count(table));
-    default:
-        return "<error>";
-    }
-};
-
-void FlowIPManager::add_handlers()
-{
-    add_read_handler("count", read_handler, h_count);
+    return rte_hash_count(hash);
 }
+
+int
+FlowIPManager::capacity()
+{
+    return _table_size;
+}
+
 
 CLICK_ENDDECLS
 

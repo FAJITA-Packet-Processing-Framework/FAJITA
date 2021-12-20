@@ -233,11 +233,41 @@ protected:
 
     static void _build_fcb(int verbose,  bool ordered);
     static void build_fcb();
-    virtual void fcb_built() {
-
-    }
+    virtual void fcb_built() {};
+    virtual int capacity() = 0;
+    virtual int count() = 0;
 
     bool stopClassifier() { return true; };
+
+        enum {
+        h_count,
+        h_capacity,
+        h_reserve,
+        h_fm_max
+    };
+
+    static String read_handler(Element *e, void *thunk) {
+        VirtualFlowManager *f = static_cast<VirtualFlowManager *>(e);
+
+        intptr_t cnt = (intptr_t)thunk;
+        switch (cnt) {
+        case h_count:
+            return String(f->count());
+        case h_capacity:
+            return String(f->capacity());
+        case h_reserve:
+            return String(f->_reserve);
+        default:
+            return "<error>";
+        }
+    }
+
+    void add_handlers() override {
+        add_read_handler("count", read_handler, h_count);
+        add_read_handler("capacity", read_handler, h_capacity);
+        add_read_handler("reserve", read_handler, h_reserve);
+        FlowElement::add_handlers();
+    }
 
     friend class CTXElement;
 };

@@ -38,7 +38,9 @@ protected:
 	inline int find(IPFlow5ID &f);
 	inline int insert(IPFlow5ID &f, int flowid);
     inline int remove(IPFlow5ID &f);
-    inline int count();
+    virtual int count() override;
+    virtual int capacity() override;
+    virtual int total_capacity() override;
 	inline void process(Packet *p, BatchBuilder &b, Timestamp &recent);
 
     friend class VirtualFlowManagerIMP;

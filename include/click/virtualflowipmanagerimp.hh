@@ -269,6 +269,14 @@ class VirtualFlowIPManagerIMP : public VirtualFlowManager,
     // This method will be called by a timer by default.
     virtual int maintainer(int core);
 
+    virtual int count() override {
+        return get_count();
+    }
+
+    virtual int capacity() override {
+        return _table_size;
+    }
+
   protected:
     // The core of the element!
     virtual void process(Packet *p, BatchBuilder &b, Timestamp &recent, int core);
@@ -449,6 +457,23 @@ class VirtualFlowIPManagerIMP : public VirtualFlowManager,
         e->_tables[core].maintain_timer->schedule_after_msec(
             e->_recycle_interval_ms);
     }
+
+
+    enum {
+        h_total_capacity = VirtualFlowManager::h_fm_max,
+        h_avg_load,
+    #if IMP_COUNTERS
+        h_cnt_count_inserts,
+        h_cnt_count_lookups,
+        h_cnt_cycles_inserts,
+        h_cnt_cycles_lookups,
+        h_killed_packets,
+        h_matched_packets,
+        h_matched_packets_ratio,
+        h_cnt_cycles_total,
+        h_maintain_removed
+    #endif
+    };
 };
 
 VFIM_TEMPLATE
@@ -843,24 +868,6 @@ int VFIM_CLASS::maintainer(int core) {
     return count;
 }
 
-enum {
-    h_count,
-    h_capacity,
-    h_total_capacity,
-    h_avg_load
-#if IMP_COUNTERS
-    ,
-    h_cnt_count_inserts,
-    h_cnt_count_lookups,
-    h_cnt_cycles_inserts,
-    h_cnt_cycles_lookups,
-    h_killed_packets,
-    h_matched_packets,
-    h_matched_packets_ratio,
-    h_cnt_cycles_total,
-    h_maintain_removed
-#endif
-};
 
 // When enough packets have passed, we compute the
 // average for the interval that have just passed
@@ -992,10 +999,6 @@ String VFIM_CLASS::read_handler(Element *e, void *thunk) {
 
     intptr_t cnt = (intptr_t)thunk;
     switch (cnt) {
-    case h_count:
-        return String(f->get_count());
-    case h_capacity:
-        return String(f->_table_size);
     case h_total_capacity:
         return String(f->_total_size);
     case h_avg_load:
@@ -1013,7 +1016,7 @@ String VFIM_CLASS::read_handler(Element *e, void *thunk) {
         return f->get_counter(cnt);
 #endif
     default:
-        return "<error>";
+        return VirtualFlowManager::read_handler(e,thunk);
     }
 }
 
@@ -1028,8 +1031,7 @@ int VFIM_CLASS::write_handler(const String &input, Element *e, void *thunk,
     }
 }
 VFIM_TEMPLATE void VFIM_CLASS::add_handlers() {
-    add_read_handler("count", read_handler, h_count);
-    add_read_handler("capacity", read_handler, h_capacity);
+    VirtualFlowManager::add_handlers();
     add_read_handler("total_capacity", read_handler, h_total_capacity);
     add_read_handler("avg_load", read_handler, h_avg_load);
 #if IMP_COUNTERS

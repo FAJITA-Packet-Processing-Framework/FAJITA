@@ -36,25 +36,7 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
         
     };
     
-    int parse(Args *args) {
-        double recycle_interval = 0;
-        int ret =
-            (*args)
-                .read_or_set_p("CAPACITY", _capacity, 65536) // HT capacity
-                .read_or_set("RESERVE", _reserve, 0)
-                .read_or_set("VERBOSE", _verbose, 0)
-                .read_or_set("CACHE", _cache, 1)
-                .read_or_set("TIMEOUT", _timeout, 0) // Timeout for the entries
-                .read_or_set("RECYCLE_INTERVAL", recycle_interval, 1)
-//                .read_or_set("FLOW_BATCH", _flows_batchsize, 16)
-                .consume();
-
-        _recycle_interval_ms = (int)(recycle_interval * 1000);
-        _epochs_per_sec = max(1, 1000 / _recycle_interval_ms);
-        _timeout_ms = _timeout * 1000;
-
-        return ret;
-    }
+    int parse(Args *args);
 
     int solve_initialize(ErrorHandler *errh) override
     {        
@@ -64,9 +46,9 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
         _tables.compress(passing);
 
         click_chatter("Real capacity for each table will be %d", _capacity);
-        _reserve += sizeof(uint32_t);
-        if (_timeout)
-            _reserve+= sizeof(IPFlow5ID);
+        _reserve += reserve_size();
+        if (have_maintainer && _timeout)
+            _reserve = max(_reserve, (int)sizeof(void*) + reserve_size()); // For the maintainer we need to store a pointer
         _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
 
         for (int ui = 0; ui < _tables.weight(); ui++) {
@@ -78,7 +60,7 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
                 return -1;
             }
 
-            if (_timeout > 0) {
+            if (have_maintainer && _timeout > 0) {
                 t._timer_wheel.initialize(_timeout * _epochs_per_sec);
             }
 
@@ -102,7 +84,102 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
     }
 
     
-    int maintainer() {
+    int maintainer();
+
+
+    virtual int total_capacity() = 0;
+
+protected:
+
+    #define FCB_DATA(fcb, offset) (((uint8_t *)(fcb->data_32)) + offset)
+
+    static inline uint32_t *get_fcb_flowid(FlowControlBlock *fcb) {
+        return (uint32_t *)FCB_DATA(fcb, 0);
+    };
+
+    static inline IPFlow5ID *get_fcb_key(FlowControlBlock *fcb) {
+        return (IPFlow5ID *)FCB_DATA(fcb, sizeof(uint32_t));
+    };
+
+    inline FlowControlBlock* get_fcb_from_flowid(int i) {
+        return (FlowControlBlock *)(((uint8_t *)_tables->fcbs) +
+                                _flow_state_size_full * i);
+    }
+
+    inline const int reserve_size() {
+        if (have_maintainer && _timeout)
+            return sizeof(uint32_t) + sizeof(IPFlow5ID);
+        else
+            return sizeof(uint32_t);
+    }
+
+    inline static FlowControlBlock** get_next_released_fcb(FlowControlBlock *fcb) {
+        //For the maintainter we need to keep the flow id and key
+	    return (FlowControlBlock**) FCB_DATA(fcb, reserve_size() );
+    };
+
+
+    enum {
+        h_total_capacity = h_fm_max,
+        h_fimp_max
+    };
+
+    static String vfimp_read_handler(Element *e, void *thunk) {
+        T *f = static_cast<T *>(e);
+
+        intptr_t cnt = (intptr_t)thunk;
+        switch (cnt) {
+        case h_total_capacity:
+            return f->total_capacity();
+        default:
+            return VirtualFlowManager::read_handler(e,thunk);
+        }
+    }
+
+    void add_handlers() override {
+        add_read_handler("total_capacity", read_handler, h_total_capacity);
+        VirtualFlowManager::add_handlers();
+    }
+
+    per_thread_oread<State> _tables;
+    uint32_t _capacity;
+    int _verbose;
+    uint32_t _timeout;
+    uint32_t _flow_state_size_full;
+    bool _cache;
+    uint32_t _timeout_ms;          // Timeout for deletion
+    uint32_t _epochs_per_sec;      // Granularity for the epoch
+    uint16_t _recycle_interval_ms; // When to run the maintainer
+    const bool have_maintainer = true;
+};
+
+#define VFIMP_TEMPLATE template<typename T, class State>
+#define VFIMP_PARENT VirtualFlowManagerIMP<T,State>
+
+VFIMP_TEMPLATE
+int VFIMP_PARENT::parse(Args *args) {
+    double recycle_interval = 0;
+    int ret =
+        (*args)
+            .read_or_set_p("CAPACITY", _capacity, 65536) // HT capacity
+            .read_or_set("RESERVE", _reserve, 0)
+            .read_or_set("VERBOSE", _verbose, 0)
+            .read_or_set("CACHE", _cache, 1)
+            .read_or_set("TIMEOUT", _timeout, 0) // Timeout for the entries
+            .read_or_set("RECYCLE_INTERVAL", recycle_interval, 1)
+//                .read_or_set("FLOW_BATCH", _flows_batchsize, 16)
+            .consume();
+
+    _recycle_interval_ms = (int)(recycle_interval * 1000);
+    _epochs_per_sec = max(1, 1000 / _recycle_interval_ms);
+    _timeout_ms = _timeout * 1000;
+
+    return ret;
+}
+
+
+VFIMP_TEMPLATE
+int VFIMP_PARENT::maintainer() {
         Timestamp recent = Timestamp::recent_steady();
         int dest_core = click_current_cpu_id();
         auto &state = _tables;
@@ -173,73 +250,5 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
 
         return checker;
     }
-
-
-protected:
-
-    #define FCB_DATA(fcb, offset) (((uint8_t *)(fcb->data_32)) + offset)
-
-    static inline uint32_t *get_fcb_flowid(FlowControlBlock *fcb) {
-        return (uint32_t *)FCB_DATA(fcb, 0);
-    };
-
-    static inline IPFlow5ID *get_fcb_key(FlowControlBlock *fcb) {
-        return (IPFlow5ID *)FCB_DATA(fcb, sizeof(uint32_t));
-    };
-
-    inline FlowControlBlock* get_fcb_from_flowid(int i) {
-        return (FlowControlBlock *)(((uint8_t *)_tables->fcbs) +
-                                _flow_state_size_full * i);
-    }
-
-
-    inline static const int reserve_size() {
-        return sizeof(uint32_t) + sizeof(IPFlow5ID);
-    }
-
-    inline static FlowControlBlock** get_next_released_fcb(FlowControlBlock *fcb) {
-	    return (FlowControlBlock**) FCB_DATA(fcb, reserve_size() );
-    };
-
-
-    enum {
-        h_count,
-        h_capacity,
-        h_total_capacity
-    };
-
-    static String read_handler(Element *e, void *thunk) {
-        T *f = static_cast<T *>(e);
-
-        intptr_t cnt = (intptr_t)thunk;
-        switch (cnt) {
-        case h_count:
-            return String(f->count());
-        case h_capacity:
-            return String(f->_capacity);
-        case h_total_capacity:
-            return String(f->_capacity);
-        default:
-            return "<error>";
-        }
-    }
-
-    void add_handlers() {
-        add_read_handler("count", read_handler, h_count);
-        add_read_handler("capacity", read_handler, h_capacity);
-        add_read_handler("total_capacity", read_handler, h_total_capacity);
-    }
-
-    per_thread_oread<State> _tables;
-    uint32_t _capacity;
-    int _verbose;
-    uint32_t _timeout;
-    uint32_t _flow_state_size_full;
-    bool _cache;
-    uint32_t _timeout_ms;          // Timeout for deletion
-    uint32_t _epochs_per_sec;      // Granularity for the epoch
-    uint16_t _recycle_interval_ms; // When to run the maintainer
-    const bool have_maintainer = true;
-};
 
 #endif

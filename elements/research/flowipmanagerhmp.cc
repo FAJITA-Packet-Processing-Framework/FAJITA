@@ -127,7 +127,6 @@ void FlowIPManagerHMP::process(Packet* p, BatchBuilder& b)
     }
 }
 
-
 void FlowIPManagerHMP::init_assignment(Vector<unsigned> table)
 {
 }
@@ -149,34 +148,14 @@ void FlowIPManagerHMP::push_batch(int, PacketBatch* batch)
     }
 }
 
-enum {
-    h_count,
-    h_capacity,
-    h_total_capacity
-};
-
-String
-FlowIPManagerHMP::read_handler(Element *e, void *thunk) {
-    FlowIPManagerHMP *f = static_cast<FlowIPManagerHMP *>(e);
-
-    intptr_t cnt = (intptr_t)thunk;
-    switch (cnt) {
-    case h_count:
-        return String(f->_hash.size());
-    case h_capacity:
-        return String(f->_hash.buckets());
-    case h_total_capacity:
-        return String(f->_hash.buckets());
-    default:
-        return "<error>";
-    }
+int FlowIPManagerHMP::count() {
+    return _hash.size();
 }
 
-void FlowIPManagerHMP::add_handlers() {
-    add_read_handler("count", read_handler, h_count);
-    add_read_handler("capacity", read_handler, h_capacity);
-    add_read_handler("total_capacity", read_handler, h_total_capacity);
+int FlowIPManagerHMP::capacity() {
+    return _hash.buckets();
 }
+
 
 CLICK_ENDDECLS
 

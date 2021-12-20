@@ -83,6 +83,23 @@ FlowIPManager_CuckooPP::count()
 }
 
 int
+FlowIPManager_CuckooPP::capacity()
+{
+    return _capacity;
+}
+
+int
+FlowIPManager_CuckooPP::total_capacity()
+{
+    int total = 0;
+    for (int i = 0; i < _tables.weight(); i++) {
+        total += _capacity;
+    }
+    return total;
+}
+
+
+int
 FlowIPManager_CuckooPP::insert(IPFlow5ID &f, int flowid)
 {
     auto *table = reinterpret_cast<rte_hash_hvariant *> (_tables->hash);
@@ -130,7 +147,7 @@ FlowIPManager_CuckooPP::process(Packet *p, BatchBuilder &b, Timestamp &recent) {
         uint32_t flowid;
         flowid = state.imp_flows_pop();
         if (unlikely(flowid == 0)) {
-            click_chatter("%p{element}: ID is 0 and table is full!", this);
+            click_chatter("%p{element}: ID is 0 and table is full (%d/%d)!", this, count(), capacity() );
             p->kill();
             return;
         }
