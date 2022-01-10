@@ -9155,12 +9155,12 @@ fi
 if test "${enable_ctx+set}" = set; then :
   enableval=$enable_ctx;
 else
-  enable_ctx=no
+  enable_ctx=NO
 fi
 test "x$enable_all_elements" = xyes -a \( "x$enable_ctx" = xNO -o "x$enable_ctx" = x \) -a "x$enable_flow" = xyes   && enable_ctx=yes
 if test "x$enable_ctx" = xyes; then
     :
-    enable_ctx=no
+    enable_ctx=yes
 fi
 # Check whether --enable-grid was given.
 if test "${enable_grid+set}" = set; then :
