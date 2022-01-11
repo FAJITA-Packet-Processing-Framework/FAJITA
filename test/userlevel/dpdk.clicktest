@@ -15,7 +15,7 @@ DPDKInfo(2048)
 i :: InfiniteSource("A", LIMIT 2, ACTIVE false, STOP false) -> ToDPDKDevice(0)
 FromDPDKDevice(0) -> Print() -> Discard
 
-Script(wait 10ms, print "Starting pktgen" ,write i.active true, wait 100ms, stop)
+Script(wait 10ms, print "Starting pktgen", write i.active true, wait 100ms, stop)
 
 %expect stdout
 Starting pktgen

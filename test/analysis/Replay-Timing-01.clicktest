@@ -1,3 +1,6 @@
+%require
+click-buildtool provides simtime
+
 %script
 click --simtime CONFIG
 

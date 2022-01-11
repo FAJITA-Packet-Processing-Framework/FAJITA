@@ -1,6 +1,9 @@
 %info
 Check that ARPQuerier continues to query after 1 minute.
 
+%require
+click-buildtool provides simtime
+
 %script
 $VALGRIND click --simtime CONFIG
 

@@ -1,5 +1,5 @@
 %require
-click-buildtool provides flow ctx
+click-buildtool provides flow ctx flowdynamic
 
 %script
 click COMPLEX

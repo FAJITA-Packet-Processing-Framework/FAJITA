@@ -2,6 +2,9 @@
 
 UDPRewriter patterns preference for the original source port.
 
+%require
+click-buildtool provides simtime
+
 %script
 
 $VALGRIND click --simtime -e "

@@ -1,6 +1,9 @@
 %info
 Streaming timeout.
 
+%require
+click-buildtool provides simtime
+
 %script
 
 $VALGRIND click --simtime -e "

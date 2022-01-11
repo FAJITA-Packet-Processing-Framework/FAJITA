@@ -1,6 +1,9 @@
 %info
 Pattern reconfiguration, mapping unparsing, and mapping lookup.
 
+%require
+click-buildtool provides simtime
+
 %script
 
 $VALGRIND click --simtime -e "

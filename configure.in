@@ -2684,13 +2684,17 @@ else
     enable_flow="no"
 fi
 
+dnl add 'flowdynamic' if compiled with --enable-flow-dynamic
+if test "x$enable_flow_dynamic" = xyes; then
+    provisions="$provisions flowdynamic"
+fi
+
 dnl add 'ctx', HAVE_CTX if compiled with --enable-ctx
 if test "x$enable_ctx" = xyes; then
     provisions="$provisions ctx"
 else
     enable_ctx="no"
 fi
-
 
 dnl add 'experimental' if --enable-experimental was supplied
 if test "x$enable_experimental" = xyes; then
@@ -2794,6 +2798,11 @@ fi
 dnl add 'rsspp' if RSS++ is available
 if test "x$enable_rsspp" = xyes; then
     provisions="$provisions rsspp"
+fi
+
+dnl add 'simtime' if compiled with --enable-simtime > 1
+if test "$enable_simtime" != no; then
+    provisions="$provisions simtime"
 fi
 
 dnl add 'smpclick' if compiled with --enable-multithread > 1

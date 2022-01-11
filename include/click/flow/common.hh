@@ -42,7 +42,7 @@ CLICK_DECLS
 	#define FLOW_INDEX(table,index) table.unchecked_at(index)
 #endif
 
-#define HAVE_DYNAMIC_FLOW_RELEASE_FNT HAVE_DYNAMIC_FLOW
+#define HAVE_DYNAMIC_FLOW_RELEASE_FNT HAVE_FLOW_DYNAMIC
 
 class FlowControlBlock;
 class FCBPool;
