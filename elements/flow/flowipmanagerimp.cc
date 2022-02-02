@@ -81,6 +81,9 @@ int FlowIPManagerIMP::solve_initialize(ErrorHandler *errh)
             return errh->error("Could not init flow table %d : error %d (%s)!", i, rte_errno, rte_strerror(rte_errno));
 
         _tables[i].fcbs =  (FlowControlBlock*)CLICK_ALIGNED_ALLOC(_flow_state_size_full * _table_size);
+        if (!_tables[i].fcbs )
+            return errh->error("Cannot allocate memory for table!");
+
         CLICK_ASSERT_ALIGNED(_tables[i].fcbs);
         bzero(_tables[i].fcbs,_flow_state_size_full * _table_size);
         if (!_tables[i].fcbs)
