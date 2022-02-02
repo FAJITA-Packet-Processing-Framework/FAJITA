@@ -27,6 +27,7 @@
 #include <clicknet/icmp.h>
 #include <click/packet_anno.hh>
 #include <click/handlercall.hh>
+
 CLICK_DECLS
 
 #define SEC_OLDER(s1, s2)	((int)(s1 - s2) < 0)
@@ -606,7 +607,7 @@ AggregateIPFlows::push_batch(int, PacketBatch *batch)
 }
 
 PacketBatch *
-AggregateIPFlows::pull_batch(int, int max)
+AggregateIPFlows::pull_batch(int, unsigned max)
 {
     PacketBatch *batch = input(0).pull_batch(max);
     if (batch) {
