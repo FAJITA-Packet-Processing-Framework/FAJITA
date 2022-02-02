@@ -15,6 +15,7 @@ FlowCounter([CLOSECONNECTION])
 
 =s middlebox
 
+Counts the number of packets per flow.
 
  */
 
