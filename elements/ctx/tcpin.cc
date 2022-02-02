@@ -830,11 +830,12 @@ void TCPIn::release_tcp(FlowControlBlock* fcb, void* thunk) {
 
     tin->release_tcp_internal(fcb);
 
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
     if (fcb_in->previous_fnt) {
         flow_assert(fcb_in->previous_fnt != &release_tcp);
         fcb_in->previous_fnt(fcb, fcb_in->previous_thunk);
     }
-
+#endif
 }
 
 /**
@@ -844,7 +845,10 @@ void TCPIn::release_tcp(FlowControlBlock* fcb, void* thunk) {
 void TCPIn::releaseFCBState() {
     //click_chatter("TCP is closing, killing state");
     fcb_release_timeout();
+
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
     fcb_remove_release_fnt(fcb_data(), &release_tcp);
+#endif
     SFCB_STACK(
             release_tcp_internal(fcb_save);
     );

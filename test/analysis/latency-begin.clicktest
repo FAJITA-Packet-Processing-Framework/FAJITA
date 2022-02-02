@@ -4,6 +4,9 @@ RecordTimestamp ecosystem
 Test the RecordTimestamp ecosystem (TimestampDiff, NumberPacket, ...)
 For some reason with clang the simtime is different.
 
+%require
+click-buildtool provides simtime
+
 %script
 click -j 1 CONFIG --simtime --simtick 1000
 

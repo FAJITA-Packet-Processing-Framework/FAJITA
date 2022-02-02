@@ -337,7 +337,9 @@ int CTXManager::_replace_leafs(ErrorHandler *errh) {
 #if HAVE_FLOW_DYNAMIC
         nfcb->reset_count(1);
 #endif
+#if HAVE_DYNAMIC_FLOW_RELEASE_FNT
         nfcb->release_fnt = 0;
+#endif
         ptr->set_leaf(nfcb);
     }, true, true);
 
@@ -633,7 +635,7 @@ String CTXManager::read_handler(Element* e, void* thunk) {
             fc->_table.get_root()->print(-1,false,true,false);
             fcb_table = 0;
             return String("");
-#if HAVE_DYNAMIC_FLOW
+#if HAVE_FLOW_DYNAMIC
         case h_timeout_count:
             return String(fc->_table.old_flows->count());
 #endif

@@ -69,7 +69,7 @@ FlowIPManager::configure(Vector<String> &conf, ErrorHandler *errh)
     }
 #endif
 
-    _reserve += sizeof(IPFlow5ID)  + sizeof(FlowControlBlock);
+    _reserve += sizeof(IPFlow5ID);
 
     return 0;
 }
@@ -85,11 +85,11 @@ int FlowIPManager::solve_initialize(ErrorHandler *errh)
     hash_params.hash_func_init_val = 0;
     hash_params.extra_flag = _flags;
 
-    assert(_reserve >=  sizeof(IPFlow5ID) + sizeof(FlowControlBlock));
-    _flow_state_size_full = _reserve;
+    assert(_reserve >=  sizeof(IPFlow5ID));
+    _flow_state_size_full = _reserve + sizeof(FlowControlBlock);
 
     if (_verbose)
-     errh->message("Per-flow size is %d", _reserve);
+     errh->message("Per-flow size is %d, %d with FCB", _reserve, _flow_state_size_full);
     sprintf(buf, "%s", name().c_str());
     hash = rte_hash_create(&hash_params);
     if (!hash)
@@ -101,7 +101,9 @@ int FlowIPManager::solve_initialize(ErrorHandler *errh)
     if (!fcbs)
         return errh->error("Could not init data table !");
 
-    if (_timeout > 0) {
+    if (_timeout) {
+        if (_timeout < 0)
+            return errh->error("Timeout must be positive");
         _timer_wheel.initialize(_timeout);
 
         _timer.initialize(this);
@@ -180,6 +182,7 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
         if (unlikely(_verbose > 1))
             click_chatter("New flow %d", ret);
         fcb = (FlowControlBlock*)((unsigned char*)fcbs + (_flow_state_size_full * ret));
+
         //Remember ID for deletion
         *((IPFlow5ID*)&fcb->data_32[0]) = fid;
         if (_timeout) {
@@ -203,7 +206,7 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
         if (batch) {
             fcb_stack->lastseen = recent;
 #if HAVE_FLOW_DYNAMIC
-	    fcb_stack->acquire(batch->count());
+            fcb_stack->acquire(batch->count());
 #endif
             output_push_batch(0, batch);
         }
@@ -229,7 +232,7 @@ void FlowIPManager::push_batch(int, PacketBatch* batch)
     if (batch) {
         fcb_stack->lastseen = recent;
 #if HAVE_FLOW_DYNAMIC
-	    fcb_stack->acquire(batch->count());
+        fcb_stack->acquire(batch->count());
 #endif
         output_push_batch(0, batch);
     }

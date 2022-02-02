@@ -688,7 +688,7 @@ ELEMENTS_ARG_ENABLE(aqm, [include active queue management elements], yes)
 ELEMENTS_ARG_ENABLE(ethernet, [include Ethernet elements], yes)
 ELEMENTS_ARG_ENABLE(etherswitch, [include Ethernet switch elements], NO)
 ELEMENTS_ARG_ENABLE(flow, [include Enable flow system and elements], NO)
-ELEMENTS_ARG_ENABLE(ctx, [include Context-based elements], no, enable_ctx=no , [ -a "x$enable_flow" = xyes ] )
+ELEMENTS_ARG_ENABLE(ctx, [include Context-based elements], NO, enable_ctx=yes , [ -a "x$enable_flow" = xyes ] )
 ELEMENTS_ARG_ENABLE(grid, [include Grid elements (see FAQ)], NO)
 ELEMENTS_ARG_ENABLE(icmp, [include ICMP elements], yes)
 ELEMENTS_ARG_ENABLE(ip, [include IP elements], yes)
@@ -2690,13 +2690,17 @@ else
     enable_flow="no"
 fi
 
+dnl add 'flowdynamic' if compiled with --enable-flow-dynamic
+if test "x$enable_flow_dynamic" = xyes; then
+    provisions="$provisions flowdynamic"
+fi
+
 dnl add 'ctx', HAVE_CTX if compiled with --enable-ctx
 if test "x$enable_ctx" = xyes; then
     provisions="$provisions ctx"
 else
     enable_ctx="no"
 fi
-
 
 dnl add 'experimental' if --enable-experimental was supplied
 if test "x$enable_experimental" = xyes; then
@@ -2800,6 +2804,11 @@ fi
 dnl add 'rsspp' if RSS++ is available
 if test "x$enable_rsspp" = xyes; then
     provisions="$provisions rsspp"
+fi
+
+dnl add 'simtime' if compiled with --enable-simtime > 1
+if test "$enable_simtime" != no; then
+    provisions="$provisions simtime"
 fi
 
 dnl add 'smpclick' if compiled with --enable-multithread > 1

@@ -127,6 +127,10 @@ install-local-include: stamp-h installch
 	$(INSTALL_DATA_IF_CHANGED) $(top_builddir)/include/click/*.h $(DESTDIR)$(clickincludedir)
 	$(mkinstalldirs) $(DESTDIR)$(clickincludedir)/flow
 	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/click/flow/*.hh $(DESTDIR)$(clickincludedir)/flow
+	$(mkinstalldirs) $(DESTDIR)$(clickincludedir)/flow/node
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/click/flow/node/*.hh $(DESTDIR)$(clickincludedir)/flow/node
+	$(mkinstalldirs) $(DESTDIR)$(clickincludedir)/flow/level
+	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/click/flow/level/*.hh $(DESTDIR)$(clickincludedir)/flow/level
 	$(mkinstalldirs) $(DESTDIR)$(clickincludedir)/standard
 	$(INSTALL_DATA_IF_CHANGED) $(srcdir)/include/click/standard/*.hh $(DESTDIR)$(clickincludedir)/standard
 	$(mkinstalldirs) $(DESTDIR)$(netincludedir)

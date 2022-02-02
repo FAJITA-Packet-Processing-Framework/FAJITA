@@ -240,7 +240,7 @@ bool cmp(el a, el b)
     return a.count > b.count || (a.count==b.count &&  a.distance < b.distance);
 }
 
-VirtualFlowManager::VirtualFlowManager()
+VirtualFlowManager::VirtualFlowManager() : _reserve(0)
 {
 
 }

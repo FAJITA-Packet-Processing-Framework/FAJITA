@@ -1,6 +1,9 @@
 %info
 Mapping capacity sharing and overflow (small capacity).
 
+%require
+click-buildtool provides simtime
+
 %script
 
 $VALGRIND click --simtime -e "

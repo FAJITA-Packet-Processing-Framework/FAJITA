@@ -2,6 +2,9 @@
 
 Reserved area for new flows.
 
+%require
+click-buildtool provides simtime
+
 %script
 $VALGRIND click --simtime -e "
 rw :: IPRewriter(pattern 2.0.0.1 1024-65535# - - 0 1, drop,

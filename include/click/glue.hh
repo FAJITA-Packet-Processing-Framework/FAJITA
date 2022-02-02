@@ -767,7 +767,6 @@ inline click_cycles_t cycles_hz() {
     if (likely(dpdk_enabled)) {
         return rte_get_timer_hz();
     }
-    return 0;
 #endif
     if (click_cycles_hz == 0) {
         click_cycles_t tsc_freq = click_get_cycles();

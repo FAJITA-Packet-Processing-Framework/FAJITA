@@ -4,6 +4,7 @@
 #include <click/lexer.hh>
 #include <click/driver.hh>
 #include <click/userutils.hh>
+#include <click/timestamp.hh>
 
 #define HELP_OPT                300
 #define VERSION_OPT             301
@@ -39,9 +40,11 @@ static const Clp_Option options[] = {
     { "socket", 0, SOCKET_OPT, Clp_ValInt, 0 },
     { "port", 'p', PORT_OPT, Clp_ValString, 0 },
     { "quit", 'q', QUIT_OPT, 0, 0 },
+#if TIMESTAMP_WARPABLE
     { "simtime", 0, SIMTIME_OPT, Clp_ValDouble, Clp_Optional },
     { "simulation-time", 0, SIMTIME_OPT, Clp_ValDouble, Clp_Optional },
     { "simtick", 0, SIMTICK_OPT, Clp_ValUnsignedLong, Clp_Mandatory },
+#endif
     { "threads", 'j', THREADS_OPT, Clp_ValInt, 0 },
     { "cpu", 0, THREADS_AFF_OPT, Clp_ValInt, Clp_Optional | Clp_Negate },
     { "affinity", 'a', THREADS_AFF_OPT, Clp_ValInt, Clp_Optional | Clp_Negate },

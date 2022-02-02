@@ -1,6 +1,9 @@
 %info
 Degenerate mappings should avoid a crash.
 
+%require
+click-buildtool provides simtime
+
 %script
 
 $VALGRIND click --simtime -e "

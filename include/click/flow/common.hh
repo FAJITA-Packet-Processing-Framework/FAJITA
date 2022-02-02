@@ -42,7 +42,7 @@ CLICK_DECLS
 	#define FLOW_INDEX(table,index) table.unchecked_at(index)
 #endif
 
-#define HAVE_DYNAMIC_FLOW_RELEASE_FNT HAVE_DYNAMIC_FLOW
+#define HAVE_DYNAMIC_FLOW_RELEASE_FNT HAVE_FLOW_DYNAMIC
 
 class FlowControlBlock;
 class FCBPool;
@@ -556,7 +556,7 @@ inline void FlowControlBlock::_do_release() {
     flow_assert(!(flags & FLOW_TIMEOUT_INLIST));
 #endif
     flow_assert(thread == click_current_cpu_id());
-    //click_chatter("Release fnt is %p",release_fnt);
+    //click_chatter("Release fnt of %p is %p, thunk %p",this, release_fnt, thunk);
     SFCB_STACK(
 #if HAVE_DYNAMIC_FLOW_RELEASE_FNT
        if (release_fnt)
