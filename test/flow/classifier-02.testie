@@ -5,7 +5,7 @@ It is actually not possible for f and g to be true,
 f and g result in always drop. It is not possible to have 0/10 and 0/12 on the same path, idem for g.
 
 %require
-click-buildtool provides flow ctx
+click-buildtool provides flow flowdynamic ctx
 
 %script
 click C

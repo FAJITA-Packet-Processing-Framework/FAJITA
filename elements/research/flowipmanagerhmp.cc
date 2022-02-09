@@ -48,7 +48,10 @@ FlowIPManagerHMP::configure(Vector<String> &conf, ErrorHandler *errh)
 
     find_children(_verbose);
 
+#if HAVE_VERBOSE_BATCH
+    //Quick fix for test mode
     click_chatter("WARNING: This element does not support timeout !");
+#endif
 
     router()->get_root_init_future()->postOnce(&_fcb_builded_init_future);
 
@@ -68,7 +71,7 @@ int FlowIPManagerHMP::solve_initialize(ErrorHandler *errh)
 
     _hash.resize_clear(_table_size);
 
-    click_chatter("%p{element}: Real table size will be %d",this, _hash.size());
+    click_chatter("%p{element}: Real table size will be %d", this, _hash.buckets());
 
     fcbs =  (FlowControlBlock*)CLICK_ALIGNED_ALLOC(_flow_state_size_full * _table_size);
     bzero(fcbs,_flow_state_size_full * _table_size);
@@ -115,7 +118,7 @@ void FlowIPManagerHMP::process(Packet* p, BatchBuilder& b)
         batch = b.finish();
         if (batch) {
 #if HAVE_FLOW_DYNAMIC
-            fcb_acquire(batch->count());        
+            fcb_stack->acquire(batch->count());
 #endif
             output_push_batch(0, batch);
         }
@@ -142,7 +145,7 @@ void FlowIPManagerHMP::push_batch(int, PacketBatch* batch)
     batch = b.finish();
     if (batch) {
 #if HAVE_FLOW_DYNAMIC
-            fcb_acquire(batch->count());        
+            fcb_stack->acquire(batch->count());
 #endif
         output_push_batch(0, batch);
     }

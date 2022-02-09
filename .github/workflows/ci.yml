@@ -20,7 +20,7 @@ jobs:
     strategy:
         matrix:
             COMPILER: [gcc, clang]
-            FRAMEWORK: [vanilla, dpdk, dpdk-light, netmap, vanilla-nopool]
+            FRAMEWORK: [vanilla, dpdk, dpdk-light, netmap, vanilla-nopool, flow]
 
     steps:
     - uses: actions/checkout@v2
@@ -69,6 +69,10 @@ jobs:
           elif [ "${{matrix.FRAMEWORK}}" = "vanilla-nopool" ] ; then
               FRAMEWORK_FLAGS="$FRAMEWORK_FLAGS --disable-click-pool"
               echo "FRAMEWORK_FLAGS=$FRAMEWORK_FLAGS" >> $GITHUB_ENV
+          elif [ "${{matrix.FRAMEWORK}}" = "flow" ] ; then
+              FRAMEWORK_FLAGS="$FRAMEWORK_FLAGS --enable-flow --enable-ctx --enable-flow-dynamic"
+              echo "FRAMEWORK_FLAGS=$FRAMEWORK_FLAGS" >> $GITHUB_ENV
+
           fi
     - name: configure
       run: |

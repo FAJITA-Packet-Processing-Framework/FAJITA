@@ -2,7 +2,7 @@
 Checking for an "else" configuration : two paths have colliding entries, but the second one is explicitely attached as an "else" path
 
 %require
-click-buildtool provides flow ctx
+click-buildtool provides flow flowdynamic ctx
 
 %script
 click -j 1 C

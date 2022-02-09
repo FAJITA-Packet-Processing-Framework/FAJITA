@@ -39,6 +39,7 @@ DriverManager(wait,wait)
 %expect stderr
 {{Placing.*}}
 {{Placing.*}}
+man :: FlowIPManagerHMP: Real table size will be 65536
    8 | 74686973 20697320
    9 | 636f6c6c 6964696e 67
    5 | 616e2061 74

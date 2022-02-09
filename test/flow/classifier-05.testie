@@ -6,7 +6,7 @@ ports it should go.
 This would be legal with FlowContextDispatcher.
 
 %require
-click-buildtool provides flow ctx
+click-buildtool provides flow flowdynamic ctx
 
 %script
 click C || exit 0

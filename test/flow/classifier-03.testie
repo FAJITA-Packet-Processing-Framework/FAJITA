@@ -3,7 +3,7 @@
 Test against stupid merges
 
 %require
-click-buildtool provides flow ctx
+click-buildtool provides flow flowdynamic ctx
 
 %script
 click C

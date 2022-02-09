@@ -4,7 +4,7 @@ Testing context link for a usual ARP configuration, first with the implicit
 context link then with an explicit CTXDispatcher.
 
 %require
-click-buildtool provides flow ctx
+click-buildtool provides flow flowdynamic ctx
 
 %script
 click CONFIG

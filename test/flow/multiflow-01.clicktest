@@ -19,3 +19,5 @@ $VALGRIND click -e "
 %expect stderr
 Placing  t1 :: TestFlowSpace at [2-5]
 Placing  t2 :: TestFlowSpace at [0-3]
+FlowIPManagerHMP@4 :: FlowIPManagerHMP: Real table size will be 65536
+FlowIPManagerHMP@2 :: FlowIPManagerHMP: Real table size will be 65536

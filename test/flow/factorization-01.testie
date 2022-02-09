@@ -1,5 +1,5 @@
 %require
-click-buildtool provides flow ctx
+click-buildtool provides flow flowdynamic ctx
 
 %info
 Simple session factorization

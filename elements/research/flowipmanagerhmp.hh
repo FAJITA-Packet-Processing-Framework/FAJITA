@@ -47,6 +47,7 @@ class FlowIPManagerHMP: public VirtualFlowManager, Router::InitFuture {
         virtual int count() override;
 
         virtual int capacity() override;
+
     private:
         HashTableMP<IPFlow5ID,int> _hash;
         atomic_uint32_t _current;
