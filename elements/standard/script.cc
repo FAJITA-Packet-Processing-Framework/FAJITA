@@ -827,11 +827,11 @@ Script::arithmetic_handler(int, String &str, Element *, const Handler *h, ErrorH
 {
     int what = (uintptr_t) h->read_user_data();
 
-    click_intmax_t accum = (what == ar_add || what == ar_sub || what == ar_count || what == ar_popcount || what == ar_gt_vec ? 0 : 1), arg;
+    click_intmax_t accum = (what == ar_add || what == ar_sub || what == ar_count || what == ar_popcount || what == ar_get_vec || what == ar_gt_vec ? 0 : 1), arg;
     bool first = true;
     int ifirst;
 #if CLICK_USERLEVEL
-    double daccum = (what == ar_add || what == ar_sub || what == ar_count || what == ar_popcount || what == ar_gt_vec ? 0 : 1), darg;
+    double daccum = (what == ar_add || what == ar_sub || what == ar_count || what == ar_popcount || what == ar_get_vec || what == ar_gt_vec ? 0 : 1), darg;
     double dfirst;
     bool use_daccum = (what == ar_div || what == ar_idiv);
     int naccum = 0;
@@ -849,7 +849,7 @@ Script::arithmetic_handler(int, String &str, Element *, const Handler *h, ErrorH
         if (use_daccum && !DoubleArg().parse(word, darg))
             return errh->error("expected list of numbers");
         if (use_daccum) {
-            if (first && what == ar_gt_vec)
+            if (first && (what == ar_gt_vec || what == ar_get_vec))
                 dfirst = darg;
             else if (first && what != ar_popcount && what != ar_count)
                 daccum = darg;
@@ -863,6 +863,8 @@ Script::arithmetic_handler(int, String &str, Element *, const Handler *h, ErrorH
                 daccum += (abs(darg) > 0.00001f ? 1 : 0);
             else if (what == ar_gt_vec)
                 daccum += (abs(darg) > dfirst ? 1 : 0);
+            else if (what == ar_get_vec)
+                daccum += (naccum == (int)dfirst + 2 ? darg : 0);
             else if (what == ar_sub)
                 daccum -= darg;
             else if (what == ar_min)
@@ -879,7 +881,8 @@ Script::arithmetic_handler(int, String &str, Element *, const Handler *h, ErrorH
         if (!IntArg().parse(word, arg))
             return errh->error("expected list of numbers");
 #endif
-        if (first && what == ar_gt_vec)
+
+        if (first && (what == ar_gt_vec || what == ar_get_vec))
             ifirst = arg;
         else if (first && what != ar_popcount && what != ar_count)
             accum = arg;
@@ -893,6 +896,8 @@ Script::arithmetic_handler(int, String &str, Element *, const Handler *h, ErrorH
             accum += (arg != 0 ? 1 : 0);
         else if (what == ar_gt_vec)
             accum += (arg > ifirst ? 1 : 0);
+        else if (what == ar_get_vec)
+            accum += (naccum == ifirst + 2? arg : 0);
         else if (what == ar_sub)
             accum -= arg;
         else if (what == ar_min)
@@ -1379,6 +1384,7 @@ Script::add_handlers()
     set_handler("count", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_count, 0);
     set_handler("popcount", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_popcount, 0);
     set_handler("gt_vec", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_gt_vec, 0);
+    set_handler("get_vec", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_get_vec, 0);
     set_handler("mul", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_mul, 0);
     set_handler("div", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_div, 0);
     set_handler("idiv", Handler::f_read | Handler::f_read_param, arithmetic_handler, ar_idiv, 0);

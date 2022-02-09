@@ -51,23 +51,24 @@ tagain:
     // Code taken from SimpleQueue::push().
     int h = head(), t = tail(), nt = next_i(t);
 
-    if (nt != h) {
-	_q[t] = p;
-	set_tail(nt);
+    if (likely(nt != h)) {
+        _q[t] = p;
+        set_tail(nt);
 
-	int s = size(h, nt);
-	if (s > _highwater_length)
-	    _highwater_length = s;
+        int s = size(h, nt);
+        if (s > _highwater_length)
+            _highwater_length = s;
 
-	_empty_note.wake();
-
+            _empty_note.wake();
     } else {
-	if (_drops == 0 && _capacity > 0)
-	        click_chatter("%p{element}: overflow", this);
-	_drops++;
-        if (_blocking)
+        if (_drops == 0 && _capacity > 0)
+                click_chatter("%p{element}: overflow", this);
+        _drops++;
+        if (unlikely(_blocking && router()->running())) {
+            click_relax_fence();
             goto tagain;
-	    checked_output_push(1, p);
+        }
+        checked_output_push(1, p);
     }
 }
 

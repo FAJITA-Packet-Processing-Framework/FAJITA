@@ -52,7 +52,8 @@ public:
 
     void push_batch(int, PacketBatch* batch);
 
-
+    virtual int count() override;
+    virtual int capacity() override;
 
     void add_handlers();
 

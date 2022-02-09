@@ -59,12 +59,14 @@ tagain:
     // Code taken from SimpleQueue::push().
     Storage::index_type h = head(), t = tail(), nt = next_i(t);
 
-    if (nt != h)
-	push_success(h, t, nt, p);
+    if (likely(nt != h))
+	    push_success(h, t, nt, p);
     else {
-        if (_blocking)
+        if (unlikely(_blocking && router()->running())) {
+            click_relax_fence();
             goto tagain;
-	push_failure(p);
+        }
+        push_failure(p);
     }
 }
 

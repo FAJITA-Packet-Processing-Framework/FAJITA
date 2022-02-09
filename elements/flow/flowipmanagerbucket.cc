@@ -338,9 +338,32 @@ void FlowIPManagerBucket::add_handlers() {
 }
 
 
+int
+FlowIPManagerBucket::count()
+{
+    int total = 0;
+    for (int i = 0; i < _groups; i++) {
+        total += rte_hash_count(_tables[i].hash);
+    }
+    return total;
+}
 
-
-
+int
+FlowIPManagerBucket::capacity()
+{
+    return _table_size;
+}
+/*
+int
+FlowIPManagerBucket::total_capacity()
+{
+    int total = 0;
+    for (int i = 0; i < _groups; i++) {
+        total += _table_size;
+    }
+    return total;
+}
+*/
 CLICK_ENDDECLS
 
 ELEMENT_REQUIRES(dpdk dpdk17 rsspp)

@@ -210,23 +210,24 @@ tagain:
     Storage::index_type h = head(), t = tail(), nt = next_i(t);
 
     // should this stuff be in SimpleQueue::enq?
-    if (nt != h) {
-	_q[t] = p;
-	set_tail(nt);
+    if (likely(nt != h)) {
+        _q[t] = p;
+        set_tail(nt);
 
-	int s = size(h, nt);
-	if (s > _highwater_length)
-	    _highwater_length = s;
-
+        int s = size(h, nt);
+        if (s > _highwater_length)
+            _highwater_length = s;
     } else {
-	// if (!(_drops % 100))
-	if (_drops == 0 && _capacity > 0)
-	        click_chatter("%p{element}: overflow", this);
+        // if (!(_drops % 100))
+        if (_drops == 0 && _capacity > 0)
+                click_chatter("%p{element}: overflow", this);
 	    _drops++;
 
-        if (_blocking)
+        if (unlikely(_blocking && router()->running())) {
+            click_relax_fence();
             goto tagain;
-	checked_output_push(1, p);
+        }
+	    checked_output_push(1, p);
     }
 }
 

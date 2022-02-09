@@ -54,7 +54,8 @@ class FlowIPManager: public VirtualFlowManager, public Router::InitFuture {
         void run_timer(Timer*) override;
         bool run_task(Task* t) override;
 
-        void add_handlers() override CLICK_COLD;
+        virtual int count() override;
+        virtual int capacity() override;
 
     protected:
         volatile int owner;
@@ -73,7 +74,6 @@ class FlowIPManager: public VirtualFlowManager, public Router::InitFuture {
 
         bool _cache;
 
-        static String read_handler(Element* e, void* thunk);
         inline void process(Packet* p, BatchBuilder& b, const Timestamp& recent);
         TimerWheel<FlowControlBlock> _timer_wheel;
 };

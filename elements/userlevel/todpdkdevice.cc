@@ -315,8 +315,17 @@ void ToDPDKDevice::push(int, Packet *p)
         }
         set_flush_timer(iqueue); //We wait until burst for sending packets, so flushing timer is especially important here
 
-        // If we're in blocking mode, we loop until we can put p in the iqueue
-    } while (unlikely(_blocking && congestioned));
+        // If we're in blocking mode, we loop until we can put p in the iqueue. But we stop if the router is not active.
+        if (unlikely(_blocking && congestioned)) {
+            if (unlikely(!router()->running())) {
+                break;
+            }
+            click_relax_fence();
+            //Loop
+        } else {
+            break;
+        }
+    } while (true);
 
 # if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
     if (likely(is_fullpush()))
@@ -387,8 +396,17 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
         }
         set_flush_timer(iqueue);
 
-        // If we're in blocking mode, we loop until we can put p in the iqueue
-    } while (unlikely(_blocking && congestioned));
+        // If we're in blocking mode, we loop until we can put p in the iqueue. But we stop if the router is not active.
+        if (unlikely(_blocking && congestioned)) {
+            if (unlikely(!router()->running())) {
+                break;
+            }
+            click_relax_fence();
+            //Loop
+        } else {
+            break;
+        }
+    } while (true);
 
 #  if !CLICK_PACKET_USE_DPDK && !CLICK_PACKET_INSIDE_DPDK
     //If non-blocking, drop all packets that could not be sent
@@ -469,8 +487,17 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
                         add_count(sent);
                         base+=sent;
                         count -=sent;
-                    } while (count > 0);
-
+                        // If we're in blocking mode, we loop until we can put p in the iqueue. But we stop if the router is not active.
+                        if (unlikely(count > 0)) {
+                            if (unlikely(!router()->running())) {
+                                break;
+                            }
+                            click_relax_fence();
+                            //Loop
+                        } else {
+                            break;
+                        }
+                    } while (true);
                 } else {
                     add_dropped(count - sent);
                     while (sent < count) {
@@ -492,6 +519,6 @@ void ToDPDKDevice::push_batch(int, PacketBatch *head)
 
 
 CLICK_ENDDECLS
-ELEMENT_REQUIRES(userlevel dpdk)
+ELEMENT_REQUIRES(userlevel dpdk QueueDevice)
 EXPORT_ELEMENT(ToDPDKDevice)
 ELEMENT_MT_SAFE(ToDPDKDevice)

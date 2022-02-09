@@ -220,7 +220,8 @@ void FlowIPManager::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
     }
 }
 
-void FlowIPManager::push_batch(int, PacketBatch* batch)
+void
+FlowIPManager::push_batch(int, PacketBatch* batch)
 {
     BatchBuilder b;
     Timestamp recent = Timestamp::recent_steady();
@@ -232,30 +233,24 @@ void FlowIPManager::push_batch(int, PacketBatch* batch)
     if (batch) {
         fcb_stack->lastseen = recent;
 #if HAVE_FLOW_DYNAMIC
-        fcb_stack->acquire(batch->count());
+        fcb_acquire(batch->count());
 #endif
         output_push_batch(0, batch);
     }
 }
 
-enum {h_count};
-String FlowIPManager::read_handler(Element* e, void* thunk)
+int
+FlowIPManager::count()
 {
-    FlowIPManager* fc = static_cast<FlowIPManager*>(e);
-
-    rte_hash* table = fc->hash;
-    switch ((intptr_t)thunk) {
-    case h_count:
-        return String(rte_hash_count(table));
-    default:
-        return "<error>";
-    }
-};
-
-void FlowIPManager::add_handlers()
-{
-    add_read_handler("count", read_handler, h_count);
+    return rte_hash_count(hash);
 }
+
+int
+FlowIPManager::capacity()
+{
+    return _table_size;
+}
+
 
 CLICK_ENDDECLS
 

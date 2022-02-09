@@ -42,10 +42,13 @@ FlowIPManagerHMP::configure(Vector<String> &conf, ErrorHandler *errh)
             .read_or_set_p("CAPACITY", _table_size, 65536)
             .read_or_set("RESERVE", _reserve, 0)
             .read_or_set("VERBOSE", _verbose, 0)
+            .read_or_set("CACHE", _cache, 1)
             .complete() < 0)
         return -1;
 
     find_children(_verbose);
+
+    click_chatter("WARNING: This element does not support timeout !");
 
     router()->get_root_init_future()->postOnce(&_fcb_builded_init_future);
 
@@ -64,6 +67,8 @@ int FlowIPManagerHMP::solve_initialize(ErrorHandler *errh)
     _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
 
     _hash.resize_clear(_table_size);
+
+    click_chatter("%p{element}: Real table size will be %d",this, _hash.size());
 
     fcbs =  (FlowControlBlock*)CLICK_ALIGNED_ALLOC(_flow_state_size_full * _table_size);
     bzero(fcbs,_flow_state_size_full * _table_size);
@@ -89,6 +94,11 @@ void FlowIPManagerHMP::post_migrate(DPDKDevice* dev, int from)
 void FlowIPManagerHMP::process(Packet* p, BatchBuilder& b)
 {
     IPFlow5ID fid = IPFlow5ID(p);
+
+    if (_cache && fid == b.last_id) {
+        b.append(p);
+        return;
+    }
     bool first = false;
 
     auto ptr = _hash.find_create(fid, [this,&first](){
@@ -103,14 +113,19 @@ void FlowIPManagerHMP::process(Packet* p, BatchBuilder& b)
     } else {
         PacketBatch* batch;
         batch = b.finish();
-        if (batch)
+        if (batch) {
+#if HAVE_FLOW_DYNAMIC
+            fcb_acquire(batch->count());        
+#endif
             output_push_batch(0, batch);
+        }
         fcb_stack = (FlowControlBlock*)((unsigned char*)fcbs + _flow_state_size_full * ret);
+        if (_cache)
+            b.last_id = fid;
         b.init();
         b.append(p);
     }
 }
-
 
 void FlowIPManagerHMP::init_assignment(Vector<unsigned> table)
 {
@@ -125,9 +140,22 @@ void FlowIPManagerHMP::push_batch(int, PacketBatch* batch)
     }
 
     batch = b.finish();
-    if (batch)
+    if (batch) {
+#if HAVE_FLOW_DYNAMIC
+            fcb_acquire(batch->count());        
+#endif
         output_push_batch(0, batch);
+    }
 }
+
+int FlowIPManagerHMP::count() {
+    return _hash.size();
+}
+
+int FlowIPManagerHMP::capacity() {
+    return _hash.buckets();
+}
+
 
 CLICK_ENDDECLS
 
