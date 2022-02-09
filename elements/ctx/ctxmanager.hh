@@ -113,6 +113,8 @@ public:
 		return _table;
 	}
 
+    int capacity();
+    int count();
 protected:
     int _initialize_timers(ErrorHandler *errh);
     int _replace_leafs(ErrorHandler *errh);

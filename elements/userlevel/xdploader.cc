@@ -1,3 +1,11 @@
+extern "C" {
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <net/if.h>
+#include <error.h>
+#include <errno.h>
+}
+
 #include <click/config.h>
 #include <click/args.hh>
 

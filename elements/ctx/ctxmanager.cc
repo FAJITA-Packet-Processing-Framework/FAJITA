@@ -19,7 +19,7 @@ CLICK_DECLS
 CTXManager::CTXManager(): _aggcache(false), _cache(0), _cache_size(4096), _cache_ring_size(8), _pull_burst(0),
 _builder(true), _collision_is_life(false), cache_hit(0), cache_miss(0), cache_sharing(0),
 _clean_timer(5000), _timer(this), _early_drop(true),
-    _ordered(true),_nocut(false), _optimize(true), Router::InitFuture(this) {
+    _ordered(true), _nocut(false), _optimize(true), Router::InitFuture(this) {
     in_batch_mode = BATCH_MODE_NEEDED;
 #if DEBUG_CLASSIFIER
     _verbose = 3;
@@ -613,22 +613,42 @@ void CTXManager::push_batch(int, PacketBatch* batch) {
 //#endif
 }
 
+int CTXManager::capacity() {
+    return -1;
+}
+
+int CTXManager::count() {
+            int n = 0;
+            _table.get_root()->traverse_all_leaves([&n](FlowNodePtr* ptr) {
+                #if HAVE_FLOW_DYNAMIC && FLOW_DEBUG_CLASSIFIER
+                    click_chatter("%d",ptr->leaf->count());
+                #endif
+                n++;
+            },true,true);
+            fcb_table = 0;
+            return n;
+}
+
 enum {h_leaves_count, h_active_count, h_print, h_timeout_count};
 String CTXManager::read_handler(Element* e, void* thunk) {
     CTXManager* fc = static_cast<CTXManager*>(e);
 
     fcb_table = &fc->_table;
     switch ((intptr_t)thunk) {
-        case h_active_count:
-        case h_leaves_count: {
+        case h_active_count: {
             int n = 0;
             fc->_table.get_root()->traverse_all_leaves([&n](FlowNodePtr* ptr) {
                 #if HAVE_FLOW_DYNAMIC && FLOW_DEBUG_CLASSIFIER
                     click_chatter("%d",ptr->leaf->count());
                 #endif
                 n++;
-            },true,(intptr_t)thunk==h_leaves_count);
+            },true,false);
+
             fcb_table = 0;
+            return String(n);
+        }
+        case h_leaves_count: {
+            int n = fc->count();
             return String(n);
         }
         case h_print:
@@ -645,6 +665,7 @@ String CTXManager::read_handler(Element* e, void* thunk) {
 };
 
 void CTXManager::add_handlers() {
+    VirtualFlowManager::add_handlers();
     add_read_handler("leaves_count", CTXManager::read_handler, h_leaves_count);
     add_read_handler("leaves_all_count", CTXManager::read_handler, h_leaves_count);
     add_read_handler("leaves_nondefault_count", CTXManager::read_handler, h_active_count);

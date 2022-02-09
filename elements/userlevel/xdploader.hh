@@ -6,12 +6,6 @@
 #include <click/vector.hh>
 #include <click/bpf.hh>
 
-extern "C" {
-#include <net/if.h>
-#include <error.h>
-#include <errno.h>
-}
-
 CLICK_DECLS
 
 
