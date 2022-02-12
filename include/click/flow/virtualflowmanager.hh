@@ -113,7 +113,7 @@ protected:
             return sizeof(uint32_t);
     }
 
-    inline static FlowControlBlock** get_next_released_fcb(FlowControlBlock *fcb) {
+    inline FlowControlBlock** get_next_released_fcb(FlowControlBlock *fcb) {
         //For the maintainter we need to keep the flow id and key
 	    return (FlowControlBlock**) FCB_DATA(fcb, reserve_size() );
     };

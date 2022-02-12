@@ -975,7 +975,7 @@ int VFIM_CLASS::alloc_fcb(int core) {
     click_chatter("[%i] FCB table will be %lu Bytes (%f GB)",
            core,
            nb_bytes,
-           nb_bytes / (1024 * 1024 * 1024.0d));
+           nb_bytes / (double)(1024 * 1024 * 1024));
 
     if (!is_imp && core > 0)  {
         return 0;
