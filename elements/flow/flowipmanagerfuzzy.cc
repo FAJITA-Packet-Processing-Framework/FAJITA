@@ -21,10 +21,6 @@
 #include <click/routervisitor.hh>
 #include <click/straccum.hh>
 #include "flowipmanagerfuzzy.hh"
-#include <rte_hash.h>
-#include <rte_hash_crc.h>
-#include "../userlevel/fromdpdkdevice.hh"
-#include <rte_ethdev.h>
 
 CLICK_DECLS
 
