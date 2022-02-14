@@ -215,6 +215,9 @@ int SFMaker::solve_initialize(ErrorHandler *errh)
 # endif
 #endif
     }
+
+    //TODO : verify no downstream elements use flow space if REMANAGE is false
+    //
     return Router::InitFuture::solve_initialize(errh);
 }
 
@@ -421,11 +424,6 @@ bool SFMaker::schedule_burst_from_flow(SFSlot& f, TSCTimestamp& now, unsigned ma
 bool SFMaker::run_task(Task* t)
 {
     TSCTimestamp next = TSCTimestamp();
-
-#if HAVE_FLOW
-    if (!_remanage)
-        assert(fcb_stack == 0);
-#endif
 #if SF_PRIO
     //Priority queue ordering bursts of different flows by emergency
     FlowQueue q = FlowQueue();
