@@ -54,6 +54,7 @@ private:
     int _table_size;
     int _flow_state_size_full;
     int _verbose;
+    bool _dpdk_numa;
 
     gtable* _tables;
 

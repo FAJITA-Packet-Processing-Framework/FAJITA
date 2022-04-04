@@ -20,6 +20,9 @@
 #include <click/ipflowid.hh>
 #include <click/routervisitor.hh>
 #include <click/straccum.hh>
+#if HAVE_NUMA
+#include <click/numa.hh>
+#endif
 #include "flowipmanagerfuzzy.hh"
 
 CLICK_DECLS
@@ -36,9 +39,11 @@ int
 FlowIPManagerFuzzy::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
-		.read_or_set_p("CAPACITY", _table_size, 65536)
-            .read_or_set("RESERVE",_reserve, 0)
-
+		    .read_or_set_p("CAPACITY", _table_size, 65536)
+            .read_or_set("RESERVE", _reserve, 0)
+#if HAVE_DPDK && HAVE_NUMA
+            .read_or_set("DPDK_NUMA", _dpdk_numa, true)
+#endif
             .complete() < 0)
         return -1;
 
@@ -55,15 +60,21 @@ int FlowIPManagerFuzzy::solve_initialize(ErrorHandler *errh) {
 
     _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
 
-    int weight = get_passing_threads().weight();
+    auto passing = get_passing_threads();
 
-    _tables = CLICK_ALIGNED_NEW(gtable,64);
+
+    _tables = CLICK_ALIGNED_NEW(gtable, passing.size());
 
     CLICK_ASSERT_ALIGNED(_tables);
 
-    for (int i = 0; i < 64; i++) {
+    for (int i = 0; i < passing.size(); i++) {
+        if (!passing[i])
+            continue;
 
-        _tables[i].fcbs =  (FlowControlBlock*)CLICK_ALIGNED_ALLOC(_flow_state_size_full * _table_size);
+        if (_dpdk_numa)
+            _tables[i].fcbs = (FlowControlBlock*)rte_malloc_socket(0, _flow_state_size_full * _table_size, CLICK_CACHE_LINE_SIZE, Numa::get_numa_node_of_cpu(i));
+        else
+            _tables[i].fcbs =  (FlowControlBlock*)CLICK_ALIGNED_ALLOC(_flow_state_size_full * _table_size);
         click_chatter("Allocating %d", i);
         bzero(_tables[i].fcbs,_flow_state_size_full * _table_size);
         CLICK_ASSERT_ALIGNED(_tables[i].fcbs);

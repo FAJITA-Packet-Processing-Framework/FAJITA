@@ -14,7 +14,7 @@ BurstStats
 
 =s counters
 
-keep statistics about bursts, defined as the number of packets from the same flow following each others
+keep statistics about bursts, defined as the number of packets from the same flow following each others. Flows are identified using the AGGREGATE anno.
 
 =d
 
