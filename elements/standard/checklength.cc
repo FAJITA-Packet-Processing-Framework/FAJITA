@@ -19,6 +19,7 @@
 #include "checklength.hh"
 #include <click/args.hh>
 #include <click/error.hh>
+#include <click/batchbuilder.hh>
 CLICK_DECLS
 
 CheckLength::CheckLength()
@@ -53,6 +54,36 @@ CheckLength::pull(int)
   } else
     return p;
 }
+
+#if HAVE_BATCH
+void
+CheckLength::push_batch(int, PacketBatch *batch)
+{
+  PacketList builder;
+  FOR_EACH_PACKET_SAFE(batch, p) {
+    if (p->length() + (_use_extra_length ? EXTRA_LENGTH_ANNO(p) : 0) > _max)
+      checked_output_push_batch(1, PacketBatch::make_from_packet(p));
+    else
+      builder.append(p);
+  }
+  if (!builder.empty())
+    output_push_batch(0, builder.finish());
+}
+
+PacketBatch *
+CheckLength::pull_batch(int, unsigned max)
+{
+  PacketBatch *batch = input(0).pull_batch(max);
+  PacketList builder;
+  FOR_EACH_PACKET_SAFE(batch, p) {
+    if (p && (p->length() + (_use_extra_length ? EXTRA_LENGTH_ANNO(p) : 0)) > _max) {
+      checked_output_push_batch(1, PacketBatch::make_from_packet(p));
+    } else
+      builder.append(p);
+  }
+  return builder.finish();
+}
+#endif
 
 void
 CheckLength::add_handlers()

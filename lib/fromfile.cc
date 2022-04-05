@@ -573,10 +573,8 @@ FromFile::get_string(size_t size, ErrorHandler *errh)
 Packet *
 FromFile::get_packet(size_t size, uint32_t sec, uint32_t subsec, ErrorHandler *errh)
 {
-#if CLICK_PACKET_USE_DPDK
-#else
+#if !CLICK_PACKET_USE_DPDK && !CLICK_NOINDIRECT
     if (_pos + size <= _len) {
-
         if (Packet *p = _data_packet->clone()) {
             p->shrink_data(_buffer + _pos, size);
             p->timestamp_anno().assign(sec, subsec);
