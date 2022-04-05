@@ -8,6 +8,9 @@
 #include <rte_hash.h>
 #include <click/dpdk_glue.hh>
 #include <rte_ethdev.h>
+#if HAVE_NUMA
+#include <click/numa.hh>
+#endif
 
 extern "C" {
         #include <cuckoopp/rte_hash_bloom.h>
@@ -27,6 +30,11 @@ int FlowIPManager_CuckooPP::configure(Vector<String> &conf, ErrorHandler *errh) 
     router()->get_root_init_future()->postOnce(&_fcb_builded_init_future);
     _fcb_builded_init_future.post(this);
 
+    _reserve += reserve_size();
+    click_chatter("Reserve is %d bytes", reserve_size());
+    if (have_maintainer && _timeout)
+        _reserve = _reserve + (int)sizeof(void*);
+
     return 0;
 }
 
@@ -41,6 +49,9 @@ FlowIPManager_CuckooPP::alloc(FlowIPManager_CuckooPPState & table, int core, Err
 
     hash_params.name = buf;
     hash_params.entries = _capacity;
+#if HAVE_NUMA
+    hash_params.socket_id =  Numa::get_numa_node_of_cpu(core);
+#endif
 
     table.hash = rte_hash_bloom_create(&hash_params);
     if(unlikely(table.hash == nullptr))
@@ -52,7 +63,7 @@ FlowIPManager_CuckooPP::alloc(FlowIPManager_CuckooPPState & table, int core, Err
     return 0;
 }
 
-int
+inline int
 FlowIPManager_CuckooPP::find(IPFlow5ID &f)
 {
     auto *table = 	reinterpret_cast<rte_hash_hvariant *>(_tables->hash);
@@ -97,7 +108,6 @@ FlowIPManager_CuckooPP::total_capacity()
     }
     return total;
 }
-
 
 int
 FlowIPManager_CuckooPP::insert(IPFlow5ID &f, int flowid)
@@ -167,6 +177,10 @@ FlowIPManager_CuckooPP::process(Packet *p, BatchBuilder &b, Timestamp &recent) {
 
         if (_timeout)
             memcpy(get_fcb_key(fcb), &fid, sizeof(IPFlow5ID));
+
+        if( _timeout > 0) {
+            schedule_fcb_timeout(fcb);
+        }
 
     } // if ret ==0
     else {

@@ -11,7 +11,8 @@ class FlowManagerIMPState { public:
     // Flow stack management
     uint32_t *flows_stack = 0;
     int flows_stack_i;
-    TimerWheel<FlowControlBlock*> _timer_wheel;
+    TimerWheel<FlowControlBlock> _timer_wheel;
+    Timer *maintain_timer = 0;
     FlowControlBlock* _qbsr;
 
     inline uint32_t imp_flows_pop() {
@@ -26,6 +27,9 @@ class FlowManagerIMPState { public:
         return flows_stack_i < 0;
     }
 };
+
+#define VFIMP_TEMPLATE template<typename T, class State>
+#define VFIMP_PARENT VirtualFlowManagerIMP<T,State>
 
 /**
  * Element that allocates some FCB Space per-thread
@@ -46,10 +50,8 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
         _tables.compress(passing);
 
         click_chatter("Real capacity for each table will be %d", _capacity);
-        _reserve += reserve_size();
-        if (have_maintainer && _timeout)
-            _reserve = max(_reserve, (int)sizeof(void*) + reserve_size()); // For the maintainer we need to store a pointer
-        _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
+        // For the maintainer we need to store a pointer
+         _flow_state_size_full = sizeof(FlowControlBlock) + _reserve;
 
         for (int ui = 0; ui < _tables.weight(); ui++) {
             
@@ -74,6 +76,19 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
             for (int i =0; i < _capacity; i++)
                 t.imp_flows_push(i);
 
+            if (_timeout > 0) {
+
+                click_chatter("Initializing maintain timer %d", core);
+                t.maintain_timer = new Timer(this);
+                t.maintain_timer->initialize(this, true);
+                t.maintain_timer->assign(run_maintain_timer, this);
+                t.maintain_timer->move_thread(core);
+                //t.current = 0;
+                t.maintain_timer->schedule_after_msec(_recycle_interval_ms);
+            }
+
+
+
         }
 
         return Router::InitFuture::solve_initialize(errh);
@@ -86,7 +101,25 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
     
     int maintainer();
 
+    inline void schedule_fcb_timeout(FlowControlBlock* fcb) {
+        _tables->_timer_wheel.schedule_after(fcb, _timeout * _epochs_per_sec,  [this](FlowControlBlock* prev, FlowControlBlock* next)
+        {
+            *(get_next_released_fcb(prev)) = next;
+        });
+    }
 
+    // Timer stuff
+    static void run_maintain_timer(Timer *t, void *thunk) {
+        int core = click_current_cpu_id();
+        VFIMP_PARENT *e =
+            reinterpret_cast<VFIMP_PARENT *>(thunk);
+
+	    int removed = e->maintainer();
+
+
+        t->schedule_after_msec(
+            e->_recycle_interval_ms);
+    }
     virtual int total_capacity() = 0;
 
 protected:
@@ -153,9 +186,6 @@ protected:
     const bool have_maintainer = true;
 };
 
-#define VFIMP_TEMPLATE template<typename T, class State>
-#define VFIMP_PARENT VirtualFlowManagerIMP<T,State>
-
 VFIMP_TEMPLATE
 int VFIMP_PARENT::parse(Args *args) {
     double recycle_interval = 0;
@@ -165,8 +195,8 @@ int VFIMP_PARENT::parse(Args *args) {
             .read_or_set("RESERVE", _reserve, 0)
             .read_or_set("VERBOSE", _verbose, 0)
             .read_or_set("CACHE", _cache, 1)
-            .read_or_set("TIMEOUT", _timeout, 0) // Timeout for the entries
-            .read_or_set("RECYCLE_INTERVAL", recycle_interval, 1)
+            .read_or_set("TIMEOUT", _timeout, 60) // Timeout for the entries
+            .read_or_set("RECYCLE_INTERVAL", recycle_interval, 0.001)
 //                .read_or_set("FLOW_BATCH", _flows_batchsize, 16)
             .consume();
 
@@ -180,47 +210,50 @@ int VFIMP_PARENT::parse(Args *args) {
 
 VFIMP_TEMPLATE
 int VFIMP_PARENT::maintainer() {
+        //click_chatter("Timeout!");
+
         Timestamp recent = Timestamp::recent_steady();
         int dest_core = click_current_cpu_id();
-        auto &state = _tables;
+        auto &state = *_tables;
         while (state._qbsr) {
             FlowControlBlock* next = *get_next_released_fcb(state._qbsr);
-            flows_push(dest_core, *get_fcb_flowid(state._qbsr));
+            state.imp_flows_push(*get_fcb_flowid(state._qbsr));
             state._qbsr = next;
         }
+        T* c = reinterpret_cast<T*>(this);
 
         int checker = 0;
-        auto &tw = state._timer_weel;
-        tw.run_timers([this,recent,&checker, tw, state, dest_core](FlowControlBlock* prev) -> FlowControlBlock* {
-            if (unlikely(checker >= _capacity))
+        auto &tw = state._timer_wheel;
+        tw.run_timers([c,recent,&checker, &tw, &state, dest_core](FlowControlBlock* prev) -> FlowControlBlock* {
+            if (unlikely(checker >= c->_capacity))
             {
                 click_chatter("Loop detected!");
                 abort();
             }
-            FlowControlBlock * next = *get_next_released_fcb(prev);
+            FlowControlBlock * next = *c->get_next_released_fcb(prev);
             //Verify lastseen is not in the future
             if (unlikely(recent <= prev->lastseen)) {
 
                 int64_t old = (recent - prev->lastseen).msecval();
                 click_chatter("Old %li : %s %s fid %d",old, recent.unparse().c_str(), prev->lastseen.unparse().c_str(),get_fcb_flowid(prev) );
 
-                tw.schedule_after(prev, _timeout * _epochs_per_sec,  [](FlowControlBlock* prev, FlowControlBlock* next)
+             tw.schedule_after(prev, c->_timeout * c->_epochs_per_sec,  [c](FlowControlBlock* prev, FlowControlBlock* next)
     {
-        *(T::get_next_released_fcb(prev)) = next;
+        *(c->get_next_released_fcb(prev)) = next;
     });
                 return next;
             }
 
             int old = (recent - prev->lastseen).msecval();
 
-            if (old + _recycle_interval_ms >= _timeout * 1000) {
+            if (old + c->_recycle_interval_ms >= c->_timeout * 1000) {
 
                 //expire
 
-                int pos = T::remove(get_fcb_key(prev));
+                int pos = c->remove(*get_fcb_key(prev));
                 if (likely(pos==0))
                 {
-                    *get_next_released_fcb(prev) = state._qbsr;
+                    *c->get_next_released_fcb(prev) = state._qbsr;
                     state._qbsr = prev;
                 }
                 else
@@ -231,12 +264,12 @@ int VFIMP_PARENT::maintainer() {
                 checker++;
             } else {
                 //No need for lock as we'll be the only one to enqueue there
-                if (likely(prev != *get_next_released_fcb(prev))) {
-                    int r = (_timeout * 1000) - old; //Time left in ms
-                    r = (r * (_epochs_per_sec)) / 1000;
-                    tw.schedule_after(prev, r, [](FlowControlBlock* prev, FlowControlBlock* next)
+                if (likely(prev != *c->get_next_released_fcb(prev))) {
+                    int r = (c->_timeout * 1000) - old; //Time left in ms
+                    r = (r * (c->_epochs_per_sec)) / 1000;
+                    tw.schedule_after(prev, r, [c](FlowControlBlock* prev, FlowControlBlock* next)
     {
-        *(T::get_next_released_fcb(prev)) = next;
+        *(c->get_next_released_fcb(prev)) = next;
     });
                 }
                 else
@@ -247,7 +280,7 @@ int VFIMP_PARENT::maintainer() {
             }
             return next;
         });
-
+        //click_chatter("Cleaned %d", checker);
         return checker;
     }
 

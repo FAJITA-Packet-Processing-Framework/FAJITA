@@ -29,18 +29,18 @@ public:
 
     int configure(Vector<String> &conf, ErrorHandler *errh) override CLICK_COLD;
 
-    void push_batch(int, PacketBatch *batch) override CLICK_COLD;
+    void push_batch(int, PacketBatch *batch);
 
 protected:
 
     //Implemented for VirtualFlowManagerIMP
-    inline int alloc(FlowIPManager_CuckooPPState& table, int core, ErrorHandler* errh);
+    int alloc(FlowIPManager_CuckooPPState& table, int core, ErrorHandler* errh) CLICK_COLD;
 	inline int find(IPFlow5ID &f);
 	inline int insert(IPFlow5ID &f, int flowid);
     inline int remove(IPFlow5ID &f);
-    virtual int count() override;
-    virtual int capacity() override;
-    virtual int total_capacity() override;
+    inline int count();
+    inline int capacity();
+    inline int total_capacity();
 	inline void process(Packet *p, BatchBuilder &b, Timestamp &recent);
 
     friend class VirtualFlowManagerIMP;
