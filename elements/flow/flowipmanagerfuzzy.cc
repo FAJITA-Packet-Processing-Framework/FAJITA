@@ -70,10 +70,11 @@ int FlowIPManagerFuzzy::solve_initialize(ErrorHandler *errh) {
     for (int i = 0; i < passing.size(); i++) {
         if (!passing[i])
             continue;
-
+#if HAVE_NUMA
         if (_dpdk_numa)
             _tables[i].fcbs = (FlowControlBlock*)rte_malloc_socket(0, _flow_state_size_full * _table_size, CLICK_CACHE_LINE_SIZE, Numa::get_numa_node_of_cpu(i));
         else
+#endif
             _tables[i].fcbs =  (FlowControlBlock*)CLICK_ALIGNED_ALLOC(_flow_state_size_full * _table_size);
         click_chatter("Allocating %d", i);
         bzero(_tables[i].fcbs,_flow_state_size_full * _table_size);
