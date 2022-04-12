@@ -7,7 +7,8 @@
 #include <click/batchelement.hh>
 #include <click/routervisitor.hh>
 #include <click/pair.hh>
-#include "flow.hh"
+#include <click/error.hh>
+
 
 
 CLICK_DECLS

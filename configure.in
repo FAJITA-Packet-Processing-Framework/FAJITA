@@ -918,9 +918,13 @@ fi
 
 AC_ARG_ENABLE([sloppy],
     [AS_HELP_STRING([  --disable-sloppy], [disable Sloppy flow timeouts])],
-    [:], [enable_sloppy=yes])
+    [:], [enable_sloppy=$enable_ctx])
 if test "x$enable_sloppy" = xyes; then
-    AC_DEFINE(HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT)
+    if test "x$enable_ctx" = xyes; then
+        AC_DEFINE(HAVE_FLOW_RELEASE_SLOPPY_TIMEOUT)
+    else
+        AC_MSG_WARN([Sloppy timeout are only useful if context is enabled with --enable-ctx])
+    fi
 fi
 
 AC_ARG_ENABLE([flow-atomic],

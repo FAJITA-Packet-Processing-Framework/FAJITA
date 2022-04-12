@@ -64,6 +64,7 @@ public:
         int output;
         bool is_default;
     } Rule;
+#if HAVE_CTX
     static Rule parse(Element* owner, String s, bool verbose = false, bool add_leaf=true);
     static Rule make_drop_rule(bool ed = false) {
         Rule r = parse(0, "- drop");
@@ -72,6 +73,7 @@ public:
         return r;
     }
     static Rule make_ip_mask(IPAddress dst, IPAddress mask);
+#endif
 protected:
     FlowNode* _root;
 };

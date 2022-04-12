@@ -83,9 +83,9 @@ GENERIC_OBJS = string.o straccum.o nameinfo.o \
 USE_FLOW = @USE_FLOW@
 USE_CTX = @USE_CTX@
 ifeq ($(USE_FLOW),yes)
-GENERIC_OBJS += flow.o flowelement.o flownode.o
+GENERIC_OBJS += flowelement.o flow.o
 ifeq ($(USE_CTX),yes)
-GENERIC_OBJS += flowbuffer.o bytestreammaintainer.o modificationlist.o \
+GENERIC_OBJS += flowbuffer.o bytestreammaintainer.o modificationlist.o flowctx.o flownode.o \
 	circularbuffer.o rbt.o bufferpool.o bufferpoolnode.o ctxelement.o
 endif
 endif

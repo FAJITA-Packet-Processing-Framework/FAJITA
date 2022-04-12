@@ -20,7 +20,7 @@
 #include <clicknet/ip.h>
 #include <clicknet/tcp.h>
 #include "flowipnat.hh"
-#include <click/flow/flow.hh>
+
 
 CLICK_DECLS
 

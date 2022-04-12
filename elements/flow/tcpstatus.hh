@@ -3,7 +3,6 @@
 #include <click/string.hh>
 #include <click/timer.hh>
 #include <vector>
-#include <click/flow/flow.hh>
 #include <click/flow/flowelement.hh>
 
 CLICK_DECLS

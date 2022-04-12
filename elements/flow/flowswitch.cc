@@ -20,8 +20,6 @@
 #include <click/args.hh>
 #include <clicknet/ip.h>
 #include <clicknet/tcp.h>
-#include <click/flow/flow.hh>
-
 #include "flowswitch.hh"
 
 

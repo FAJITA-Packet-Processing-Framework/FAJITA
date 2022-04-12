@@ -134,7 +134,7 @@ private:
 		#define FLOW_TIMEOUT_MASK   0x000000ff //Delta + lastseen timestamp in msec
 
 		FlowControlBlock* next;
-
+#  if HAVE_CTX
         inline bool hasTimeout() const {
             return flags & FLOW_TIMEOUT;
         }
@@ -143,8 +143,9 @@ private:
 		    unsigned t = (flags >> FLOW_TIMEOUT_SHIFT);
 		    return t == 0 || (now - lastseen).msecval() > t;
 		}
+#  endif
 #endif
-
+#if HAVE_CTX
         #define FLOW_EARLY_DROP     0x20
         uint32_t flags;
 
@@ -158,7 +159,7 @@ private:
         inline bool is_early_drop() const {
             return flags & FLOW_EARLY_DROP;
         }
-
+#endif
 
 
 #if HAVE_DYNAMIC_FLOW_RELEASE_FNT
@@ -166,18 +167,24 @@ private:
 		void* thunk;
 #endif
 
+#if HAVE_CTX
 		FlowNode* parent;
+#endif
 
         union {
             uint8_t data[0];
             uint16_t data_16[0];
             uint32_t data_32[0];
             uint64_t data_64[0];
+#if HAVE_CTX
             FlowNodeData node_data[0];
+#endif
         };
+#if HAVE_CTX
         inline FlowNodeData& get_data() {
             return node_data[0];
         }
+#endif
         //No data after this
 
         bool combine_data(uint8_t* data, Element* origin);
@@ -185,7 +192,9 @@ private:
 #if HAVE_FLOW_DYNAMIC
 			use_count = 0;
 #endif
+#if HAVE_CTX
             flags = 0;
+#endif
 #if DEBUG_CLASSIFIER
             thread = -1;
 #endif

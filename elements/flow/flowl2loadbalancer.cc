@@ -19,7 +19,6 @@
 #include <click/glue.hh>
 #include <click/args.hh>
 #include <clicknet/ether.h>
-#include <click/flow/flow.hh>
 
 #include "flowl2loadbalancer.hh"
 

@@ -18,8 +18,6 @@
 #include <click/config.h>
 #include <click/glue.hh>
 #include <click/args.hh>
-#include <click/flow/flow.hh>
-
 #include "storeflowid.hh"
 
 

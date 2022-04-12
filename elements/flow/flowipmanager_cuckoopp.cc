@@ -153,7 +153,6 @@ FlowIPManager_CuckooPP::process(Packet *p, BatchBuilder &b, Timestamp &recent) {
     int ret = find(fid);
 
     if (ret == 0) {
-
         uint32_t flowid;
         flowid = state.imp_flows_pop();
         if (unlikely(flowid == 0)) {
@@ -169,6 +168,7 @@ FlowIPManager_CuckooPP::process(Packet *p, BatchBuilder &b, Timestamp &recent) {
             click_chatter("%p{element}: Could not insert flow!", this);
             state.imp_flows_push(flowid);
             p->kill();
+            abort();
             return;
         }
 
@@ -186,6 +186,7 @@ FlowIPManager_CuckooPP::process(Packet *p, BatchBuilder &b, Timestamp &recent) {
     else {
         // Old flow
         fcb = get_fcb_from_flowid(ret);
+        rte_prefetch0(fcb);
     }
 
     if (have_maintainer)

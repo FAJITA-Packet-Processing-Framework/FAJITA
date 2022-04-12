@@ -9,7 +9,6 @@
 #include <click/args.hh>
 #include <clicknet/ip.h>
 #include <clicknet/tcp.h>
-#include <click/flow/flow.hh>
 
 CLICK_DECLS
 

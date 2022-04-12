@@ -65,17 +65,17 @@ RatedUnqueue::configure_helper(TokenBucket *tb, bool is_bandwidth, Element *elt,
 	return -1;
 
     if (dur_specified && tokens_specified)
-	return errh->error("cannot specify both BURST_DURATION and BURST_SIZE");
+	    return errh->error("cannot specify both BURST_DURATION and BURST_SIZE");
     else if (!tokens_specified) {
-	bigint::limb_type res[2];
-	bigint::multiply(res[1], res[0], r, dur_msec);
-	bigint::divide(res, res, 2, 1000);
-	tokens = res[1] ? UINT_MAX : res[0];
+        bigint::limb_type res[2];
+        bigint::multiply(res[1], res[0], r, dur_msec);
+        bigint::divide(res, res, 2, 1000);
+        tokens = res[1] ? UINT_MAX : res[0];
     }
 
     if (is_bandwidth) {
-	unsigned new_tokens = tokens + tb_bandwidth_thresh;
-	tokens = (tokens < new_tokens ? new_tokens : UINT_MAX);
+        unsigned new_tokens = tokens + tb_bandwidth_thresh;
+        tokens = (tokens < new_tokens ? new_tokens : UINT_MAX);
     }
 
     tb->assign(r, tokens ? tokens : 1);
