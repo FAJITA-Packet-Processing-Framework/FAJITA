@@ -24,7 +24,20 @@ struct FRLState {
     TokenBucket tb;
 };
 
-class FlowRateLimiter : public FlowStateElement<FlowRateLimiter,FRLState>
+class StateChecker { public:
+    struct str  {
+    };
+    static inline bool seen(void* v, str*) {
+        return ((FRLState*)v)->tb.time_point() == 0;
+    }
+    static inline void mark_seen(void* v, str*) {
+    }
+    static inline void release(void* v, str*) {
+        ((FRLState*)v)->tb.set_time_point(0);
+    }
+};
+
+class FlowRateLimiter : public FlowStateElement<FlowRateLimiter,FRLState,StateChecker>
 {
 public:
     /** @brief Construct an FlowRateLimiter element
@@ -57,7 +70,10 @@ public:
 
 protected:
 
-
+    struct State {
+        uint64_t dropped;
+    };
+    per_thread<State> _state;
     static String read_handler(Element *, void *) CLICK_COLD;
     static int write_handler(const String &, Element *, void *, ErrorHandler *) CLICK_COLD;
 };

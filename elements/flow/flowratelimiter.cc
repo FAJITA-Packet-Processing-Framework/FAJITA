@@ -19,7 +19,7 @@ FlowRateLimiter::FlowRateLimiter()
 int FlowRateLimiter::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if(Args(conf, this, errh)
-    .complete() < 0)
+    .execute() < 0)
         return -1;
     return configure_helper(&_tb,this,conf,errh);
 }
@@ -50,6 +50,9 @@ FlowRateLimiter::configure_helper(TokenBucket *tb, Element *elt, Vector<String> 
     }
 
     tb->assign(r, tokens ? tokens : 1);
+
+    assert(tb->time_point() == 0);
+
     return 0;
 }
 
@@ -61,12 +64,21 @@ void FlowRateLimiter::push_flow(int, FRLState* fcb, PacketBatch* flow)
         fcb->tb.remove(flow->count());
         output_push_batch(0, flow);
     } else {
-        int n = min(fcb->tb.capacity(), flow->count());
+        unsigned c = flow->count();
+        int n = fcb->tb.size();
+                click_chatter("Filtering %d/%d", c, n);
+        if (n == 0) {
+            flow->kill();
+            return;
+        }
+
+
+
         flow->split(n)->kill();
+        _state->dropped += c - n;
         output_push_batch(0, flow);
         fcb->tb.remove(n);
     }
-    
 }
 
 
@@ -75,6 +87,11 @@ FlowRateLimiter::read_handler(Element *e, void *thunk)
 {
     FlowRateLimiter *fd = static_cast<FlowRateLimiter *>(e);
     switch ((intptr_t)thunk) {
+        case 0:
+        {
+            PER_THREAD_MEMBER_SUM(uint64_t, dropped, fd->_state, dropped);
+            return String(dropped);
+        }
       default:
           return "<error>";
     }
@@ -88,7 +105,7 @@ FlowRateLimiter::write_handler(const String &s_in, Element *e, void *thunk, Erro
 
 void
 FlowRateLimiter::add_handlers() {
-
+    add_read_handler("dropped", read_handler, 0);
 }
 
 CLICK_ENDDECLS
