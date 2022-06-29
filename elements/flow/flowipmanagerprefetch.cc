@@ -3,28 +3,30 @@
  */
 
 #include <click/config.h>
+#include <click/etheraddress.hh>
 #include <click/glue.hh>
 #include <click/args.hh>
 #include <click/ipflowid.hh>
 #include <click/routervisitor.hh>
 #include <click/error.hh>
-#include "flowipmanagerimp.hh"
+#include "flowipmanagerprefetch.hh"
 #include <rte_hash.h>
 #include <click/dpdk_glue.hh>
 #include <rte_ethdev.h>
 #include <rte_errno.h>
+#include <clicknet/ether.h>
 
 CLICK_DECLS
 
-FlowIPManagerIMP::FlowIPManagerIMP() : _verbose(1), _flags(0), _timer(this), _task(this), _tables(0), _cache(true), Router::InitFuture(this) {
+FlowIPManagerPrefetch::FlowIPManagerPrefetch() : _verbose(1), _flags(0), _timer(this), _task(this), _tables(0), _cache(true), Router::InitFuture(this) {
 }
 
-FlowIPManagerIMP::~FlowIPManagerIMP()
+FlowIPManagerPrefetch::~FlowIPManagerPrefetch()
 {
 }
 
 int
-FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
+FlowIPManagerPrefetch::configure(Vector<String> &conf, ErrorHandler *errh)
 {
     if (Args(conf, this, errh)
         .CLICK_NEVER_REPLACE(read_or_set_p)("CAPACITY", _table_size, 65536)
@@ -55,7 +57,7 @@ FlowIPManagerIMP::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
-int FlowIPManagerIMP::solve_initialize(ErrorHandler *errh)
+int FlowIPManagerPrefetch::solve_initialize(ErrorHandler *errh)
 {
     struct rte_hash_parameters hash_params = {0};
     char buf[64];
@@ -65,8 +67,8 @@ int FlowIPManagerIMP::solve_initialize(ErrorHandler *errh)
     _table_size = next_pow2(_table_size/passing.weight());
     click_chatter("Real capacity for each table will be %d", _table_size);
     hash_params.entries = _table_size;
-    hash_params.key_len = sizeof(IPFlow5ID);
-    hash_params.hash_func = ipv4_hash_crc;
+    hash_params.key_len = sizeof(uint32_t);
+    hash_params.hash_func = ipv4_hash_crc_tagged;
     hash_params.hash_func_init_val = 0;
     hash_params.extra_flag = _flags;
 
@@ -103,7 +105,7 @@ int FlowIPManagerIMP::solve_initialize(ErrorHandler *errh)
 }
 
 
-bool FlowIPManagerIMP::run_task(Task* t)
+bool FlowIPManagerPrefetch::run_task(Task* t)
 {
     /*
      Not working : the timerwheel must be per-thread too
@@ -126,13 +128,13 @@ bool FlowIPManagerIMP::run_task(Task* t)
     return false;
 }
 
-void FlowIPManagerIMP::run_timer(Timer* t)
+void FlowIPManagerPrefetch::run_timer(Timer* t)
 {
     //_task.reschedule();
    // t->reschedule_after(Timestamp::make_sec(1));
 }
 
-void FlowIPManagerIMP::cleanup(CleanupStage stage)
+void FlowIPManagerPrefetch::cleanup(CleanupStage stage)
 {
     click_chatter("Cleanup the table");
     if (_tables) {
@@ -148,14 +150,15 @@ void FlowIPManagerIMP::cleanup(CleanupStage stage)
     }
 }
 
-void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
+void FlowIPManagerPrefetch::process(Packet* p, BatchBuilder& b, const Timestamp& recent)
 {
-    IPFlow5ID fid = IPFlow5ID(p);
-
-    if (_cache && fid == b.last_id) {
-        b.append(p);
-        return;
-    }
+//    IPFlow5ID fid = IPFlow5ID(p);
+    const click_ether *ethh = (const click_ether *)p->data();
+    uint32_t key = *((uint32_t*)(ethh->ether_shost + 1));
+//    if (_cache && fid == b.last_id) {
+//        b.append(p);
+//        return;
+//    }
     auto& tab = _tables[click_current_cpu_id()];
     rte_hash* table = tab.hash;
 
@@ -163,17 +166,13 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
     
 
     if (_prefetch > 0) {
-        uint16_t next_sport = fid.sport();
-        uint16_t human_sport = (next_sport & 0xFF00) >> 8 | (next_sport & 0x00FF) << 8;
-        human_sport += _prefetch;
-        next_sport = (human_sport & 0xFF00) >> 8 | (human_sport & 0x00FF) << 8;
-        IPFlow5ID nextFlowID = IPFlow5ID(fid.saddr(), next_sport, fid.daddr(), fid.dport(), p->ip_header()->ip_p);
-	rte_hash_prefetch(table, &nextFlowID, _prefetch_secondary, _prefetch_lvl);
+        uint32_t predicted_key = *((uint32_t*)(ethh->ether_dhost + 1));
+	rte_hash_prefetch(table, &predicted_key, _prefetch_secondary, _prefetch_lvl);
     }
 
-    int ret = rte_hash_lookup(table, &fid);
+    int ret = rte_hash_lookup(table, &key);
     if (ret < 0) { //new flow
-        ret = rte_hash_add_key(table, &fid);
+        ret = rte_hash_add_key(table, &key);
         if (unlikely(ret < 0)) {
             if (unlikely(_verbose > 0)) {
                 click_chatter("Cannot add key (have %d items. Error %d)!", rte_hash_count(table), ret);
@@ -186,9 +185,9 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
         fcb->data_32[0] = ret;
         if (_timeout > 0) {
             if (_flags) {
-                _timer_wheel.schedule_after_mp(fcb, _timeout, fim_setter);
+                _timer_wheel.schedule_after_mp(fcb, _timeout, fim_prefetch_setter);
             } else {
-                _timer_wheel.schedule_after(fcb, _timeout, fim_setter);
+                _timer_wheel.schedule_after(fcb, _timeout, fim_prefetch_setter);
             }
         }
     } else { //existing flow
@@ -211,12 +210,17 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
         b.init();
         b.append(p);
         b.last = ret;
-        if (_cache)
-            b.last_id = fid;
+//        if (_cache)
+//            b.last_id = fid;
     }
+
+//    if (_prefetch > 0) {
+//        uint32_t predicted_key = *((uint32_t*)(ethh->ether_dhost));
+//        rte_hash_prefetch_bucket(table, &predicted_key);
+//    }
 }
 
-void FlowIPManagerIMP::push_batch(int, PacketBatch* batch)
+void FlowIPManagerPrefetch::push_batch(int, PacketBatch* batch)
 {
     BatchBuilder b;
     Timestamp recent = Timestamp::recent_steady();
@@ -237,9 +241,9 @@ void FlowIPManagerIMP::push_batch(int, PacketBatch* batch)
 }
 
 enum {h_count};
-String FlowIPManagerIMP::read_handler(Element* e, void* thunk)
+String FlowIPManagerPrefetch::read_handler(Element* e, void* thunk)
 {
-    FlowIPManagerIMP* fc = static_cast<FlowIPManagerIMP*>(e);
+    FlowIPManagerPrefetch* fc = static_cast<FlowIPManagerPrefetch*>(e);
     switch ((intptr_t)thunk) {
     case h_count:
     {
@@ -258,7 +262,7 @@ String FlowIPManagerIMP::read_handler(Element* e, void* thunk)
     }
 };
 
-void FlowIPManagerIMP::add_handlers()
+void FlowIPManagerPrefetch::add_handlers()
 {
     add_read_handler("count", read_handler, h_count);
 }
@@ -266,5 +270,5 @@ void FlowIPManagerIMP::add_handlers()
 CLICK_ENDDECLS
 
 ELEMENT_REQUIRES(dpdk dpdk19)
-EXPORT_ELEMENT(FlowIPManagerIMP)
-ELEMENT_MT_SAFE(FlowIPManagerIMP)
+EXPORT_ELEMENT(FlowIPManagerPrefetch)
+ELEMENT_MT_SAFE(FlowIPManagerPrefetch)

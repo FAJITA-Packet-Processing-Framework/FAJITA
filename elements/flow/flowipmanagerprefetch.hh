@@ -1,5 +1,5 @@
-#ifndef CLICK_FLOWIPMANAGERIMP_HH
-#define CLICK_FLOWIPMANAGERIMP_HH
+#ifndef CLICK_FLOWIPMANAGERPREFETCH_HH
+#define CLICK_FLOWIPMANAGERPREFETCH_HH
 #include <click/config.h>
 #include <click/string.hh>
 #include <click/timer.hh>
@@ -34,12 +34,12 @@ struct rte_hash;
  * =a FlowIPManger
  *
  */
-class FlowIPManagerIMP: public VirtualFlowManager, public Router::InitFuture {
+class FlowIPManagerPrefetch: public VirtualFlowManager, public Router::InitFuture {
     public:
-        FlowIPManagerIMP() CLICK_COLD;
-        ~FlowIPManagerIMP() CLICK_COLD;
+        FlowIPManagerPrefetch() CLICK_COLD;
+        ~FlowIPManagerPrefetch() CLICK_COLD;
 
-        const char *class_name() const override { return "FlowIPManagerIMP"; }
+        const char *class_name() const override { return "FlowIPManagerPrefetch"; }
         const char *port_count() const override { return "1/1"; }
 
         const char *processing() const override { return PUSH; }
@@ -88,7 +88,7 @@ class FlowIPManagerIMP: public VirtualFlowManager, public Router::InitFuture {
         TimerWheel<FlowControlBlock> _timer_wheel;
 };
 
-const auto fim_setter = [](FlowControlBlock* prev, FlowControlBlock* next)
+const auto fim_prefetch_setter = [](FlowControlBlock* prev, FlowControlBlock* next)
 {
     *((FlowControlBlock**)&prev->data_32[2]) = next;
 };
