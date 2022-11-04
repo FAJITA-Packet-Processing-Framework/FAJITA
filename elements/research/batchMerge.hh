@@ -62,13 +62,10 @@ class BatchMerge : public BatchElement {
 #endif
 
   private:
-    Packet* process(PacketBatch *batch);
+    PacketBatch* process(PacketBatch *batch);
 
-    WritablePacket *resultp;
-    click_ether _ethh;
     unsigned _len;
-    struct in_addr _sipaddr;
-    struct in_addr _dipaddr;
+    uint32_t _max_packet_len;
 
 };
 

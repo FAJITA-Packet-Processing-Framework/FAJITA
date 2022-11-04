@@ -36,83 +36,55 @@ BatchMerge::~BatchMerge() {}
 
 int BatchMerge::configure(Vector<String> &conf, ErrorHandler *errh) {
     if (Args(conf, this, errh)
-            .read_mp("SRCETH", EtherAddressArg(), _ethh.ether_shost)
-	    .read_mp("DSTETH", EtherAddressArg(), _ethh.ether_dhost)
-	    .read_mp("SRCIP", _sipaddr)
-	    .read_mp("DSTIP", _dipaddr)
-	    .read_or_set("LENGTH", _len, 1024)
+	    .read_or_set("SPLITED_LEN", _len, 74)
+	    .read_or_set("MAX_PKT_LEN", _max_packet_len, 1500)
 //            .read_or_set_p("PORT_OFFSET_DST", _portoffset_dst, 0)
             .complete() < 0)
         return -1;
-
-    _ethh.ether_type = htons(0x0800);
 
     return 0;
 }
 
 int BatchMerge::initialize(ErrorHandler * errh) {
-    WritablePacket *q = Packet::make(_len);
-    if (unlikely(!q)){
-        return errh->error("Could not initialize packet, out of memory?");
-    }
-    
-    resultp = q;
-
-    memcpy(q->data(), &_ethh, 14);
-    click_ip *ip = reinterpret_cast<click_ip *>(q->data()+14);
-    click_udp *udp = reinterpret_cast<click_udp *>(ip + 1);
-
-    ip->ip_v = 4;
-    ip->ip_hl = sizeof(click_ip) >> 2;
-    ip->ip_len = htons(_len-14);
-    ip->ip_id = 0;
-    ip->ip_p = IP_PROTO_UDP;
-    ip->ip_src = _sipaddr;
-    ip->ip_dst = _dipaddr;
-    ip->ip_tos = 0;
-    ip->ip_off = 0;
-    ip->ip_ttl = 250;
-    ip->ip_sum = 0;
-    ip->ip_sum = click_in_cksum((unsigned char *)ip, sizeof(click_ip));
-    
-    resultp->set_dst_ip_anno(IPAddress(_dipaddr));
-    resultp->set_ip_header(ip, sizeof(click_ip));
-
-    udp->uh_sport = (click_random() >> 2) % 0xFFFF;
-    udp->uh_dport = (click_random() >> 2) % 0xFFFF;
-    udp->uh_sum = 0;
-    unsigned short len = _len-14-sizeof(click_ip);
-    udp->uh_ulen = htons(len);
-    udp->uh_sum = 0;
-    click_chatter("Template Packet Generated!");
     return 0;
 }
 
-inline Packet* BatchMerge::process(PacketBatch *batch) {
+inline PacketBatch* BatchMerge::process(PacketBatch *batch) {
     
-    Packet *packet = resultp->clone();
-    WritablePacket* q = packet->uniqueify();
-    click_ip *resultp_ip = q->ip_header();
-    int off = q->transport_header_offset() + sizeof(click_udp);
-    int i = 0;
-
+    uint32_t pad_size = _max_packet_len - _len;
+    uint32_t split_count = (_max_packet_len - _len) / _len;
+  
+    WritablePacket* iterate = batch->first()->put(pad_size);
+    batch = batch->pop_front();
+    PacketBatch* resultBatch = PacketBatch::make_from_packet(iterate);
+    
+    int i = 1;
+ 
     FOR_EACH_PACKET_SAFE(batch, p) {
+	if (i%split_count == 0){ // Create a new MergedPacket
+            iterate = p->put(pad_size);
+	    iterate->set_next(0);
+	    resultBatch->append_packet(iterate);
+	    i++;
+	    continue;
+        }
+        
 	WritablePacket *processingp = p->uniqueify();
-        click_ip *processing_ip = reinterpret_cast<click_ip *>(processingp->data()+14);
-        memcpy(q->data() + off + (i*sizeof(click_ip)) , processing_ip, sizeof(click_ip));
+        click_ip *processing_ip = reinterpret_cast<click_ip *>(processingp->data());
+        memcpy(iterate->data() + ((i/split_count)*_len) , processing_ip, _len);
+	p->kill();
         i++;
     }
+    batch=0;
     
-    return q;
+    return resultBatch;
 }
 
 #if HAVE_BATCH
 void BatchMerge::push_batch(int, PacketBatch *batch) {
-    Packet *result = process(batch);
-    batch->kill();batch = 0;
-    output_push_batch(0, PacketBatch::make_from_packet(result));
+    PacketBatch *result = process(batch);
+    output(0).push_batch(result);
 
-//    output(0).push_batch(batch);
 //    output_push_batch(0, batch);
 }
 #endif
