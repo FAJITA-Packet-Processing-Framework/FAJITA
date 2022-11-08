@@ -57,6 +57,9 @@ class BatchMerge : public BatchElement {
     int initialize(ErrorHandler *) CLICK_COLD;
     inline Packet *simple_action(Packet *p) override;
 
+    void add_handlers() override CLICK_COLD;
+    static String read_handler(Element* e, void* thunk);
+
 #if HAVE_BATCH
     inline void push_batch(int, PacketBatch *batch) override;
 #endif
@@ -66,6 +69,9 @@ class BatchMerge : public BatchElement {
 
     unsigned _len;
     uint32_t _max_packet_len;
+
+    uint32_t _input_count;
+    uint32_t _output_count;
 
 };
 

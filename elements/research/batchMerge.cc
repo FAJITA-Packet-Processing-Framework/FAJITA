@@ -28,7 +28,6 @@
 #include <click/standard/alignmentinfo.hh>
 #include <click/standard/scheduleinfo.hh>
 
-
 CLICK_DECLS
 
 BatchMerge::BatchMerge() {}
@@ -46,6 +45,8 @@ int BatchMerge::configure(Vector<String> &conf, ErrorHandler *errh) {
 }
 
 int BatchMerge::initialize(ErrorHandler * errh) {
+    _input_count = 0;
+    _output_count = 0;
     return 0;
 }
 
@@ -57,7 +58,7 @@ inline PacketBatch* BatchMerge::process(PacketBatch *batch) {
     WritablePacket* iterate = batch->first()->put(pad_size);
     batch = batch->pop_front();
     PacketBatch* resultBatch = PacketBatch::make_from_packet(iterate);
-    
+      
     int i = 1;
  
     FOR_EACH_PACKET_SAFE(batch, p) {
@@ -69,9 +70,9 @@ inline PacketBatch* BatchMerge::process(PacketBatch *batch) {
 	    continue;
         }
         
-	WritablePacket *processingp = p->uniqueify();
-        click_ip *processing_ip = reinterpret_cast<click_ip *>(processingp->data());
-        memcpy(iterate->data() + ((i/split_count)*_len) , processing_ip, _len);
+	// WritablePacket *processingp = p->uniqueify();
+        // click_ip *processing_ip = reinterpret_cast<click_ip *>(processingp->data());
+        memcpy(iterate->data() + ((i%split_count)*_len) , p->mac_header(), _len);
 	p->kill();
         i++;
     }
@@ -82,7 +83,13 @@ inline PacketBatch* BatchMerge::process(PacketBatch *batch) {
 
 #if HAVE_BATCH
 void BatchMerge::push_batch(int, PacketBatch *batch) {
+    
+    _input_count+=batch->count();
+
     PacketBatch *result = process(batch);
+
+    _output_count+=result->count();
+
     output(0).push_batch(result);
 
 //    output_push_batch(0, batch);
@@ -92,6 +99,27 @@ void BatchMerge::push_batch(int, PacketBatch *batch) {
 Packet *BatchMerge::simple_action(Packet *p) {
     return p;
 }
+
+enum {h_merge_size};
+
+String BatchMerge::read_handler(Element* e, void* thunk)
+{
+    BatchMerge* fc = static_cast<BatchMerge*>(e);
+    
+    switch ((intptr_t)thunk) {
+        case h_merge_size:
+            return String((float) fc->_input_count / (float) fc->_output_count);
+        default:
+            return "<error>";
+    }
+
+}
+
+void BatchMerge::add_handlers()
+{
+    add_read_handler("avg_merge_size", read_handler, h_merge_size);
+}
+
 
 CLICK_ENDDECLS
 EXPORT_ELEMENT(BatchMerge)
