@@ -184,6 +184,7 @@ protected:
     uint32_t _epochs_per_sec;      // Granularity for the epoch
     uint16_t _recycle_interval_ms; // When to run the maintainer
     const bool have_maintainer = true;
+    bool _bulk_search;
 };
 
 VFIMP_TEMPLATE
@@ -197,6 +198,7 @@ int VFIMP_PARENT::parse(Args *args) {
             .read_or_set("CACHE", _cache, 1)
             .read_or_set("TIMEOUT", _timeout, 60) // Timeout for the entries
             .read_or_set("RECYCLE_INTERVAL", recycle_interval, 0.001)
+	    .read_or_set("BULK_SEARCH", _bulk_search, false)
 //                .read_or_set("FLOW_BATCH", _flows_batchsize, 16)
             .consume();
 
