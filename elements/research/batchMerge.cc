@@ -27,6 +27,7 @@
 #include <click/router.hh>
 #include <click/standard/alignmentinfo.hh>
 #include <click/standard/scheduleinfo.hh>
+#include <algorithm>
 
 CLICK_DECLS
 
@@ -52,27 +53,47 @@ int BatchMerge::initialize(ErrorHandler * errh) {
 
 inline PacketBatch* BatchMerge::process(PacketBatch *batch) {
     
-    uint32_t pad_size = _max_packet_len - _len;
-    uint32_t split_count = (_max_packet_len - _len) / _len;
-  
+    // For now, we assume no unsplitted packet ends up in this batch!
+    uint32_t max_split_count = (_max_packet_len - _len) / _len;
+    uint32_t original_batch_count = batch->count();
+    uint32_t split_count = std::min(original_batch_count - 1, max_split_count);
+    
+    int bytes_to_remove_from_head = batch->first()->length() - _len;
+    if (bytes_to_remove_from_head < 0)
+        click_chatter("EXCEPTION!!!!!!!");
+    
+    int pad_size = ( _len * split_count ) - bytes_to_remove_from_head;
+    
+    click_chatter("pad_size: %d, bytes_to_remove_from_head: %d, original_batch_count: %d, split_count: %d", pad_size, bytes_to_remove_from_head, original_batch_count, split_count);
+
     WritablePacket* iterate = batch->first()->put(pad_size);
     batch = batch->pop_front();
     PacketBatch* resultBatch = PacketBatch::make_from_packet(iterate);
       
     int i = 1;
- 
+    uint8_t next_head_index = i + split_count;
+    uint8_t remained_packets = original_batch_count - 1;
     FOR_EACH_PACKET_SAFE(batch, p) {
-	if (i%split_count == 0){ // Create a new MergedPacket
-            iterate = p->put(pad_size);
+	if (i == next_head_index){ // Create a new MergedPacket
+	    // click_chatter("Miad Enja!");
+	    remained_packets = original_batch_count - i;
+	    if (remained_packets < split_count + 1){
+                pad_size = (_len * (remained_packets - 1)) - bytes_to_remove_from_head;
+	    }
+	    if (pad_size < 0){
+                p->take(bytes_to_remove_from_head);
+		iterate = p->uniqueify();
+            }
+            else
+                iterate = p->put(pad_size);
 	    iterate->set_next(0);
 	    resultBatch->append_packet(iterate);
 	    i++;
+	    next_head_index = i + split_count;
 	    continue;
         }
         
-	// WritablePacket *processingp = p->uniqueify();
-        // click_ip *processing_ip = reinterpret_cast<click_ip *>(processingp->data());
-        memcpy(iterate->data() + ((i%split_count)*_len) , p->mac_header(), _len);
+        memcpy(iterate->data() + ((i%(split_count+1))*_len) , p->mac_header(), _len);
 	p->kill();
         i++;
     }
