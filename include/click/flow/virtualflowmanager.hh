@@ -52,7 +52,7 @@ class FlowManagerIMPState : public _FlowManagerIMPState { public:
 template<typename T, class State> 
 class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFuture { public:
     VirtualFlowManagerIMP() : _tables(), _cache(true) {
-        
+
     };
 
     int parse(Args *args) {
@@ -225,31 +225,54 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
     void push_batch(int, PacketBatch *batch) override {
         BatchBuilder b;
         Timestamp recent;
+
+#if FLOW_PUSH_BATCH
+        if (fcb_queue == 0)
+            // TODO: this is statically 64 but it should be the size of the DPDK queue
+            fcb_queue = new FlowControlBlock*[64];
+        FlowControlBlock** tmp_queue = fcb_queue;
+#endif
+
         FlowControlBlock* tmp = fcb_stack;
         if (have_maintainer)
             recent = Timestamp::recent_steady();
 
         FOR_EACH_PACKET_SAFE(batch, p) {
-                ((T*)this)->process(p, b, recent);
+            ((T*)this)->process(p, b, recent);
         }
 
+#if FLOW_PUSH_BATCH
+        #if HAVE_FLOW_DYNAMIC
+            fcb_acquire(batch->count());
+        #endif
+
+        // Go back to the head of the queue
+        fcb_queue = tmp_queue;
+        output_push_batch(0, batch);
+#else
         batch = b.finish();
         if (batch) {
             if (have_maintainer && _timeout_epochs)
                 update_lastseen(fcb_stack, recent);
-            #if HAVE_FLOW_DYNAMIC
-                fcb_acquire(batch->count());
-            #endif
+#if HAVE_FLOW_DYNAMIC
+            fcb_acquire(batch->count());
+#endif
             output_push_batch(0, batch);
         }
+#endif
+
         fcb_stack = tmp;
     }
-
 
 inline void process(Packet *p, BatchBuilder &b, Timestamp &recent) {
     IPFlow5ID fid = IPFlow5ID(p);
     if (_cache && fid == b.last_id) {
+#if FLOW_PUSH_BATCH
+        (*fcb_queue) = fcb_stack;
+        fcb_queue++;
+#else
         b.append(p);
+#endif
         return;
     }
 
@@ -258,7 +281,7 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent) {
 
     int ret = ((T*)this)->find(fid);
 
-    if (ret <= 0) { 
+    if (ret <= 0) {
         uint32_t flowid;
         if constexpr (State::need_fid()) {
             flowid = state.imp_flows_pop();
@@ -269,11 +292,11 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent) {
             }
 
             // INSERT IN TABLE
-        
+
             ret = ((T*)this)->insert(fid, flowid);
 
         } else {
-            
+
             ret = ((T*)this)->insert(fid, 0);
 
             flowid = ret;
@@ -301,6 +324,22 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent) {
         fcb = get_fcb_from_flowid(ret);
     }
 
+#if FLOW_PUSH_BATCH
+    (*fcb_queue) = fcb;
+    fcb_queue++;
+
+    if (b.last != ret) {
+        if (have_maintainer && _timeout_epochs)
+            update_lastseen(fcb_stack, recent);
+
+        fcb_stack = fcb;
+
+        b.last = ret;
+        if (_cache) {
+            b.last_id = fid;
+        }
+    }
+#else
     if (b.last == ret) {
         b.append(p);
     } else {
@@ -311,9 +350,9 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent) {
         if (batch) {
             if (have_maintainer && _timeout_epochs)
                 update_lastseen(fcb_stack, recent);
-            #if HAVE_FLOW_DYNAMIC
-                fcb_acquire(batch->count());
-            #endif
+#if HAVE_FLOW_DYNAMIC
+            fcb_acquire(batch->count());
+#endif
             output_push_batch(0, batch);
         }
         fcb_stack = fcb;
@@ -324,8 +363,8 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent) {
             b.last_id = fid;
         }
     }
+#endif
 }
-
 
 protected:
 

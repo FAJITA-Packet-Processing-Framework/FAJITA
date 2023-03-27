@@ -374,6 +374,32 @@ public :
     }
 
     void push_batch(int port, PacketBatch* head) {
+#if FLOW_PUSH_BATCH
+        FlowControlBlock** tmp_queue = fcb_queue;
+
+        FOR_EACH_PACKET_SAFE(head, p) {
+            auto my_fcb = my_fcb_data_from_queue();
+            if (!Checker::seen(&my_fcb->v, &my_fcb->str)) {
+                if (static_cast<Derived*>(this)->new_flow(&my_fcb->v, p)) {
+                    Checker::mark_seen(&my_fcb->v, &my_fcb->str);
+                    if (Derived::timeout > 0)
+                        this->ctx_acquire_timeout(Derived::timeout);
+#if HAVE_FLOW_DYNAMIC
+                    this->fcb_set_release_fnt(my_fcb, &release_fnt);
+#endif
+                } else { //TODO set early drop?
+                    head->fast_kill();
+                    return;
+                }
+            }
+
+            static_cast<Derived*>(this)->push_flow_batch(port, &my_fcb->v, p);
+        }
+
+        // Go back to the head of the queue
+        fcb_queue = tmp_queue;
+        output_push_batch(0, head);
+#else
          auto my_fcb = my_fcb_data();
          if (!Checker::seen(&my_fcb->v, &my_fcb->str)) {
              if (static_cast<Derived*>(this)->new_flow(&my_fcb->v, head->first())) {
@@ -389,6 +415,7 @@ public :
              }
          }
          static_cast<Derived*>(this)->push_flow(port, &my_fcb->v, head);
+#endif
     };
 
     void close_flow() {
@@ -401,10 +428,24 @@ public :
         Checker::release(&my_fcb_data()->v, &my_fcb_data()->str);
     }
 
+#if FLOW_PUSH_BATCH
+    /* TODO: This should be virtual and implemented by each element, for now let's put an empty body for testing */
+    void push_flow_batch(int port, T* flowdata, Packet *packet) {
+
+    }
+#endif
+
 private:
     inline AT* my_fcb_data() {
         return static_cast<AT*>((void*)&fcb_stack->data[_flow_data_offset]);
     }
+
+#if FLOW_PUSH_BATCH
+    inline AT* my_fcb_data_from_queue() {
+        auto *fcb = *(fcb_queue++);
+        return static_cast<AT*>((void*)&fcb->data[_flow_data_offset]);
+    }
+#endif
 
 };
 

@@ -32,6 +32,7 @@ CLICK_DECLS
 
 
 __thread FlowControlBlock* fcb_stack = 0;
+__thread FlowControlBlock** fcb_queue = 0;
 __thread FlowTableHolder* fcb_table = 0;
 
 

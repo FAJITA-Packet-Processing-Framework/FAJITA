@@ -46,6 +46,10 @@ public:
 
     void push_flow(int port, int* fcb, PacketBatch*);
 
+#if FLOW_PUSH_BATCH
+    void push_flow_batch(int port, int* fcb, Packet *packet);
+#endif
+
     inline bool new_flow(void*, Packet*) {
         _state->count++;
         _state->open++;
