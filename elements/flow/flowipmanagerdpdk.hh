@@ -57,6 +57,7 @@ class FlowIPManager_DPDK: public VirtualFlowManagerIMP<FlowIPManager_DPDK, FlowI
 
     //Implemented for VirtualFlowManagerIMP. It is using CRTP so no override.
     inline int alloc(FlowIPManager_DPDKState& table, int core, ErrorHandler* errh);
+    inline void find_bulk(PacketBatch *batch, int32_t* positions);
 	inline int find(IPFlow5ID &f);
 	inline int insert(IPFlow5ID &f, int);
     inline int remove(IPFlow5ID &f);

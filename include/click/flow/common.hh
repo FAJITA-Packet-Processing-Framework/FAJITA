@@ -265,7 +265,7 @@ bool operator==(const FlowControlBlockRef &ra, const FlowControlBlockRef &rb);
 class FlowTableHolder;
 
 // TODO: move in configure
-#define FLOW_PUSH_BATCH 1
+#define FLOW_PUSH_BATCH 0
 
 extern __thread FlowControlBlock* fcb_stack;
 #if FLOW_PUSH_BATCH

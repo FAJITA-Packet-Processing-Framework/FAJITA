@@ -7,6 +7,7 @@
 #include <click/batchelement.hh>
 #include <click/routervisitor.hh>
 #include <click/pair.hh>
+#include <rte_prefetch.h>
 #include "flow.hh"
 
 
@@ -377,6 +378,13 @@ public :
 #if FLOW_PUSH_BATCH
         FlowControlBlock** tmp_queue = fcb_queue;
 
+/*        
+        FOR_EACH_PACKET(head, pt) {
+            auto *fcb = *(fcb_queue++);
+            rte_prefetch0(fcb);
+        }
+        fcb_queue = tmp_queue;
+*/
         FOR_EACH_PACKET_SAFE(head, p) {
             auto my_fcb = my_fcb_data_from_queue();
             if (!Checker::seen(&my_fcb->v, &my_fcb->str)) {

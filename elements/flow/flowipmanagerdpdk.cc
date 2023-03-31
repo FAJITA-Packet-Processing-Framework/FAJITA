@@ -64,6 +64,40 @@ FlowIPManager_DPDK::alloc(FlowIPManager_DPDKState & table, int core, ErrorHandle
     return 0;
 }
 
+// void
+// FlowIPManager_DPDK::find_bulk(const void ** keys, uint32_t num_keys, int32_t* positions)
+
+void
+FlowIPManager_DPDK::find_bulk(PacketBatch *batch, int32_t* positions)
+{   
+    const void *key_array[batch->count()];
+    IPFlow5ID flowIDs[batch->count()];
+
+    int index = 0;
+    FOR_EACH_PACKET(batch, p){
+        flowIDs[index] = IPFlow5ID(p);
+        key_array[index] = &flowIDs[index];
+        index++;
+    }
+
+    auto *table = 	reinterpret_cast<rte_hash*>(_tables->hash);
+    rte_hash_lookup_bulk(table, &key_array[0], batch->count(), positions);
+
+//    rte_hash_lookup_bulk(table, keys, num_keys, positions);
+
+/*
+    click_chatter("Start");
+    for (int i=0 ; i<num_keys; i++){
+        const IPFlow5ID *k;
+        k = (const IPFlow5ID *)keys[i];
+//        positions[i] = rte_hash_lookup(table, keys[i]);
+        const uint32_t *p = ((const uint32_t *)k) + 2;
+        click_chatter("key: %d:%d -> %d:%d p: %d, answer: %d", k->saddr().addr(), k->sport(), k->daddr().addr(), k->dport(), *p, positions[i]);
+    }
+*/
+}
+
+
 int
 FlowIPManager_DPDK::find(IPFlow5ID &f)
 {
@@ -101,6 +135,7 @@ FlowIPManager_DPDK::remove(IPFlow5ID &f)
 {
     auto *table = reinterpret_cast<rte_hash *> (_tables->hash);
     int ret = rte_hash_del_key(table, &f);
+    click_chatter("Remove function called!");
     return ret;
 }
 

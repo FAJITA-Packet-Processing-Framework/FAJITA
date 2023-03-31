@@ -661,6 +661,10 @@ class Packet { public:
 	return *reinterpret_cast<const click_aliasable_uint32_t *>(xanno()->c + i);
     }
 
+    const uint32_t *anno_u32_ptr(int i) const {
+        return reinterpret_cast<const click_aliasable_uint32_t *>(xanno()->c + i);
+    }
+
     /** @brief Set 32-bit annotation at offset @a i.
      * @param i annotation offset in bytes
      * @param x value
