@@ -10,6 +10,9 @@ class _FlowManagerIMPState { public:
     FlowControlBlock *fcbs;
     TimerWheel<FlowControlBlock> _timer_wheel;
     Timer* maintain_timer;
+
+    int _failed_searches = 0;
+    int _successful_searches = 0;
 };
 
 class FlowManagerIMPStateNoFID : public _FlowManagerIMPState { public:
@@ -282,6 +285,9 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent) {
     int ret = ((T*)this)->find(fid);
 
     if (ret <= 0) {
+        if (_verbose)
+            _tables->_failed_searches += 1;
+
         uint32_t flowid;
         if constexpr (State::need_fid()) {
             flowid = state.imp_flows_pop();
@@ -321,6 +327,9 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent) {
     } // (end)It's a new flow
     else
     { // Old flow
+        if (_verbose)
+            _tables->_successful_searches += 1;
+
         fcb = get_fcb_from_flowid(ret);
     }
 
@@ -415,7 +424,9 @@ protected:
         h_count,
         h_count_fids,
         h_capacity,
-        h_total_capacity
+        h_total_capacity,
+        h_failed_searches,
+        h_successful_searches
     };
 
     static String read_handler(Element *e, void *thunk) {
@@ -434,6 +445,23 @@ protected:
             return String(f->_capacity);
         case h_total_capacity:
             return String(f->_capacity);
+
+        case h_failed_searches: {
+            int total = 0;
+            for (int i = 0; i < f->_tables.weight(); i++) {
+                total += (f->_tables.get_value(i)._failed_searches);
+            }
+            return String(total);    
+        }
+
+        case h_successful_searches: {
+            int total = 0;
+            for (int i = 0; i < f->_tables.weight(); i++) {
+                total += (f->_tables.get_value(i)._successful_searches);
+            }
+            return String(total);
+        }
+
         default:
             return "<error>";
         }
@@ -444,6 +472,8 @@ protected:
         add_read_handler("count_fids", read_handler, h_count_fids);
         add_read_handler("capacity", read_handler, h_capacity);
         add_read_handler("total_capacity", read_handler, h_total_capacity);
+        add_read_handler("failed_searches", read_handler, h_failed_searches);
+        add_read_handler("successful_searches", read_handler, h_successful_searches);
     }
 
     per_thread_oread<State> _tables;

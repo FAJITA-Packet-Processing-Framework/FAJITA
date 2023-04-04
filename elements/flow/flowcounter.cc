@@ -28,6 +28,7 @@ int FlowCounter::configure(Vector<String> &conf, ErrorHandler *errh)
 void FlowCounter::push_flow(int, int* fcb, PacketBatch* flow)
 {
     *fcb += flow->count();
+    output_push_batch(0, flow);
 }
 
 #if FLOW_PUSH_BATCH
