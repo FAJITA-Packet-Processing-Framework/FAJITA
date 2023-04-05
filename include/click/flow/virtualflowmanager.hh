@@ -13,6 +13,9 @@ class _FlowManagerIMPState { public:
 
     int _failed_searches = 0;
     int _successful_searches = 0;
+
+    void **key_array = new void*[64];
+    IPFlow5ID* flowIDs = new IPFlow5ID[64];
 };
 
 class FlowManagerIMPStateNoFID : public _FlowManagerIMPState { public:
@@ -67,6 +70,7 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
                 .read_or_set("RESERVE", _reserve, 0)
                 .read_or_set("VERBOSE", _verbose, 0)
                 .read_or_set("CACHE", _cache, 1)
+                .read_or_set("BULK_SEARCH", _bulk_search, 0)
                 .read_or_set("TIMEOUT", timeout, 0) // Timeout for the entries
                 .read_or_set("RECYCLE_INTERVAL", recycle_interval, 1)
                 .consume();
@@ -240,8 +244,13 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
         if (have_maintainer)
             recent = Timestamp::recent_steady();
 
-        FOR_EACH_PACKET_SAFE(batch, p) {
-            ((T*)this)->process(p, b, recent);
+        if (!_bulk_search){
+            FOR_EACH_PACKET_SAFE(batch, p) {
+                ((T*)this)->process(p, b, recent, 0);
+            }
+        }
+        else {
+            ((T*) this)->process_bulk(batch, b, recent);
         }
 
 #if FLOW_PUSH_BATCH
@@ -267,24 +276,42 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
         fcb_stack = tmp;
     }
 
-inline void process(Packet *p, BatchBuilder &b, Timestamp &recent) {
-    IPFlow5ID fid = IPFlow5ID(p);
-    if (_cache && fid == b.last_id) {
-#if FLOW_PUSH_BATCH
-        (*fcb_queue) = fcb_stack;
-        fcb_queue++;
-#else
-        b.append(p);
-#endif
-        return;
-    }
+inline void process_bulk(PacketBatch *batch, BatchBuilder &b, Timestamp &recent) {
+    
+    int* ret = new int[batch->count()];
+    ((T*)this)->find_bulk(batch, ret);
 
+    int index = 0;
+    FOR_EACH_PACKET_SAFE(batch, pt) {
+        process(pt, b, recent, ret[index]);
+        index++;
+    }
+}
+
+inline void process(Packet *p, BatchBuilder &b, Timestamp &recent, int bulk_ret) {
+    IPFlow5ID fid = IPFlow5ID(p);
     FlowControlBlock *fcb;
     auto &state = *_tables;
+    int ret;
 
-    int ret = ((T*)this)->find(fid);
+    if (bulk_ret != 0){
+        ret = bulk_ret;
+    }
+    else {
+        if (_cache && fid == b.last_id) {
+#if FLOW_PUSH_BATCH
+            (*fcb_queue) = fcb_stack;
+            fcb_queue++;
+#else
+            b.append(p);
+#endif
+            return;
+        }
+        ret = ((T*)this)->find(fid);
+    }
 
-    if (ret <= 0) {
+
+    if (ret < 0) {
         if (_verbose)
             _tables->_failed_searches += 1;
 
@@ -481,6 +508,7 @@ protected:
     int _verbose;
     uint32_t _flow_state_size_full;
     bool _cache;
+    bool _bulk_search;
     uint32_t _timeout_epochs;
     uint32_t _timeout_ms;          // Timeout for deletion
     uint32_t _epochs_per_sec;      // Granularity for the epoch

@@ -64,6 +64,20 @@ FlowIPManager_DPDK::alloc(FlowIPManager_DPDKState & table, int core, ErrorHandle
     return 0;
 }
 
+void
+FlowIPManager_DPDK::find_bulk(PacketBatch *batch, int* positions)
+{   
+    int index = 0;
+    FOR_EACH_PACKET(batch, p){
+        _tables->flowIDs[index] = IPFlow5ID(p);
+        _tables->key_array[index] = &(_tables->flowIDs[index]);
+        index++;
+    }
+
+    auto *table = reinterpret_cast<rte_hash*>(_tables->hash);
+    rte_hash_lookup_bulk(table, const_cast<const void **>(&(_tables->key_array[0])), batch->count(), positions);
+}
+
 int
 FlowIPManager_DPDK::find(IPFlow5ID &f)
 {

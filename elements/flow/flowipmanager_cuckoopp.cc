@@ -53,6 +53,16 @@ FlowIPManager_CuckooPP::alloc(FlowIPManager_CuckooPPState & table, int core, Err
     return 0;
 }
 
+void
+FlowIPManager_CuckooPP::find_bulk(PacketBatch *batch, int32_t* positions)
+{
+    auto *table = 	reinterpret_cast<rte_hash*>(_tables->hash);
+
+    for (int i = 0; i< batch->count(); i++){
+        positions[i] = 0;
+    }  
+}
+
 int
 FlowIPManager_CuckooPP::find(IPFlow5ID &f)
 {
