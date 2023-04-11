@@ -25,6 +25,13 @@ int FlowCounter::configure(Vector<String> &conf, ErrorHandler *errh)
     return 0;
 }
 
+#if FLOW_PUSH_BATCH
+void FlowCounter::push_flow_batch(int port, int* fcb, Packet *packet) 
+{
+    *fcb += 1;
+}
+#endif
+
 void FlowCounter::push_flow(int, int* fcb, PacketBatch* flow)
 {
     *fcb += flow->count();

@@ -77,6 +77,21 @@ bool FlowIPLoadBalancer::new_flow(IPLBEntry* flowdata, Packet* p)
     return true;
 }
 
+#if FLOW_PUSH_BATCH
+void FlowIPLoadBalancer::push_flow_batch(int, IPLBEntry* flowdata, Packet* p)
+{
+    unsigned b = flowdata->chosen_server;
+    WritablePacket* q =p->uniqueify();
+    p = q;
+
+    nat_debug_chatter("Packet for flow %d", b);
+    IPAddress srv = _dsts[b];
+
+    q->ip_header()->ip_dst = srv;
+    p->set_dst_ip_anno(srv);
+    track_load(p, b);
+}
+#endif
 
 void FlowIPLoadBalancer::push_flow(int, IPLBEntry* flowdata, PacketBatch* batch)
 {

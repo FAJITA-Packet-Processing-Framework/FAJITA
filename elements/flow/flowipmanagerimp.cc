@@ -149,10 +149,13 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
 {
     IPFlow5ID fid = IPFlow5ID(p);
 
+#if !FLOW_PUSH_BATCH
     if (_cache && fid == b.last_id) {
         b.append(p);
         return;
     }
+#endif
+
     auto& tab = _tables[click_current_cpu_id()];
     rte_hash* table = tab.hash;
 
@@ -182,6 +185,14 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
         fcb = (FlowControlBlock*)((unsigned char*)tab.fcbs + (_flow_state_size_full * ret));
     }
 
+#if FLOW_PUSH_BATCH
+    fcb_stack = fcb;
+    fcb_stack->lastseen = recent;
+
+    (*fcb_queue) = fcb;
+    fcb_queue++;
+
+#else
     if (b.last == ret) {
         b.append(p);
     } else {
@@ -201,15 +212,34 @@ void FlowIPManagerIMP::process(Packet* p, BatchBuilder& b, const Timestamp& rece
         if (_cache)
             b.last_id = fid;
     }
+#endif
 }
 
 void FlowIPManagerIMP::push_batch(int, PacketBatch* batch)
 {
     BatchBuilder b;
     Timestamp recent = Timestamp::recent_steady();
+
+#if FLOW_PUSH_BATCH
+        if (fcb_queue == 0)
+            // TODO: this is statically 64 but it should be the size of the DPDK queue
+            fcb_queue = new FlowControlBlock*[64];
+        FlowControlBlock** tmp_queue = fcb_queue;
+#endif
+
     FOR_EACH_PACKET_SAFE(batch, p) {
         process(p, b, recent);
     }
+
+#if FLOW_PUSH_BATCH
+        #if HAVE_FLOW_DYNAMIC
+            fcb_stack->acquire(batch->count());
+        #endif
+
+        // Go back to the head of the queue
+        fcb_queue = tmp_queue;
+        output_push_batch(0, batch);
+#else
 
     batch = b.finish();
     if (batch) {
@@ -219,6 +249,7 @@ void FlowIPManagerIMP::push_batch(int, PacketBatch* batch)
 #endif
         output_push_batch(0, batch);
     }
+#endif
 
     fcb_stack = 0;
 }
