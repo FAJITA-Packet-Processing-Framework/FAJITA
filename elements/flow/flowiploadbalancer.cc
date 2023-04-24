@@ -66,8 +66,8 @@ int FlowIPLoadBalancer::initialize(ErrorHandler *errh)
 bool FlowIPLoadBalancer::new_flow(IPLBEntry* flowdata, Packet* p)
 {
     if (isTCP(p) && !isSyn(p)) {
-	if(unlikely(_verbose))
-	    click_chatter("Non syn establishment!");
+	    if(unlikely(_verbose))
+	        click_chatter("Non syn establishment!");
         if (!_accept_nonsyn)
             return false;
     }
@@ -109,20 +109,23 @@ void FlowIPLoadBalancer::push_flow(int, IPLBEntry* flowdata, PacketBatch* batch)
 }
 
 #if FLOW_PUSH_BATCH
-void FlowIPLoadBalancer::push_flow_batch(int, IPLBEntry* flowdata, Packet* p)
+void FlowIPLoadBalancer::push_flow_batch(int, IPLBEntry** flowdata, PacketBatch *head)
 {
-    unsigned b = flowdata->chosen_server;
-    WritablePacket* q =p->uniqueify();
-    p = q;
+    int i = 0;
+    FOR_EACH_PACKET_SAFE(head, p) {
+        unsigned b = flowdata[i]->chosen_server;
+        WritablePacket* q =p->uniqueify();
+        p = q;
 
-    if(unlikely(_verbose)) {
-        click_chatter("Packet for flow %d", b);
+        if(unlikely(_verbose)) {
+            click_chatter("Packet for flow %d", b);
+        }
+        IPAddress srv = _dsts[b];
+
+        q->ip_header()->ip_dst = srv;
+        p->set_dst_ip_anno(srv);
+        track_load(p, b);
     }
-    IPAddress srv = _dsts[b];
-
-    q->ip_header()->ip_dst = srv;
-    p->set_dst_ip_anno(srv);
-    track_load(p, b);
 }
 #endif
 

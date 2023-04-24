@@ -377,24 +377,41 @@ public :
 #if FLOW_PUSH_BATCH
         FlowControlBlock** tmp_queue = fcb_queue;
 
-        FOR_EACH_PACKET_SAFE(head, p) {
+
+        T** fcbs = new T*[head->count()]; 
+        int i = 0;
+
+        int idx = 0;
+        Packet* p = head->first();
+        Packet* fep_next = ((p != 0)? p->next() : 0 );
+        for (;p != 0;idx++,p=fep_next,fep_next=(p==0?0:p->next())) {
+/*            if (idx < (head->count() - 2)){
+                auto *next_fcb = *(fcb_queue+2);
+                rte_prefetch0((void*)&next_fcb->data[_flow_data_offset]);
+            }
+*/
             auto my_fcb = my_fcb_data_from_queue();
             if (!Checker::seen(&my_fcb->v, &my_fcb->str)) {
-                if (static_cast<Derived*>(this)->new_flow(&my_fcb->v, p)) {
+                if (likely(static_cast<Derived*>(this)->new_flow(&my_fcb->v, p))) {
                     Checker::mark_seen(&my_fcb->v, &my_fcb->str);
                     if (Derived::timeout > 0)
                         this->ctx_acquire_timeout(Derived::timeout);
 #if HAVE_FLOW_DYNAMIC
-                    this->fcb_set_release_fnt(my_fcb, &release_fnt);
+                        this->fcb_set_release_fnt(my_fcb, &release_fnt);
 #endif
                 } else { //TODO set early drop?
                     head->fast_kill();
                     return;
                 }
             }
-
-            static_cast<Derived*>(this)->push_flow_batch(port, &my_fcb->v, p);
+            
+           if(static_cast<Derived*>(this)->is_fcb_large())
+               static_cast<Derived*>(this)->prefetch_fcb(0, &my_fcb->v);
+           fcbs[i] = &my_fcb->v;
+           i++;
         }
+
+        static_cast<Derived*>(this)->push_flow_batch(port, fcbs, head);
 
         // Go back to the head of the queue
         fcb_queue = tmp_queue;
@@ -430,9 +447,17 @@ public :
 
 #if FLOW_PUSH_BATCH
     /* TODO: This should be virtual and implemented by each element, for now let's put an empty body for testing */
-    void push_flow_batch(int port, T* flowdata, Packet *packet) {
+    void push_flow_batch(int port, T** flowdata, PacketBatch *head) {
 
     }
+    void prefetch_fcb(int, T*) {
+
+    }
+
+    bool is_fcb_large(){
+        return 0;
+    }
+
 #endif
 
 private:

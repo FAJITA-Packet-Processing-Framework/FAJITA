@@ -47,7 +47,7 @@ public:
     void push_flow(int port, int* fcb, PacketBatch*);
 
 #if FLOW_PUSH_BATCH
-    void push_flow_batch(int port, int* fcb, Packet *packet);
+    void push_flow_batch(int port, int** fcb, PacketBatch *head);
 #endif
 
     inline bool new_flow(void*, Packet*) {
@@ -64,7 +64,7 @@ protected:
         long count;
         long open;
         Vector<int> lengths;
-    };
+    } CLICK_CACHE_ALIGN;
     per_thread<fcstate> _state;
 
     static String read_handler(Element *, void *) CLICK_COLD;

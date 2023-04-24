@@ -14,8 +14,8 @@ class _FlowManagerIMPState { public:
     int _failed_searches = 0;
     int _successful_searches = 0;
 
-    void **key_array = new void*[64];
-    IPFlow5ID* flowIDs = new IPFlow5ID[64];
+    void **key_array = new void*[256];
+    IPFlow5ID* flowIDs = new IPFlow5ID[256];
 };
 
 class FlowManagerIMPStateNoFID : public _FlowManagerIMPState { public:
@@ -73,13 +73,13 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
                 .read_or_set("BULK_SEARCH", _bulk_search, 0)
                 .read_or_set("TIMEOUT", timeout, 0) // Timeout for the entries
                 .read_or_set("RECYCLE_INTERVAL", recycle_interval, 1)
+                .read_or_set("PROCESS_BATCH", _processing_batch_size, 256)
                 .consume();
 
         _recycle_interval_ms = (int)(recycle_interval * 1000);
         _epochs_per_sec = max(1, 1000 / _recycle_interval_ms);
         _timeout_ms = timeout * 1000;
         _timeout_epochs = timeout * _epochs_per_sec;
-
         //_reserve += reserve_size() is called by the parrent
 
         return ret;
@@ -236,7 +236,7 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
 #if FLOW_PUSH_BATCH
         if (fcb_queue == 0)
             // TODO: this is statically 64 but it should be the size of the DPDK queue
-            fcb_queue = new FlowControlBlock*[64];
+            fcb_queue = new FlowControlBlock*[256];
         FlowControlBlock** tmp_queue = fcb_queue;
 #endif
 
@@ -254,13 +254,19 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
         }
 
 #if FLOW_PUSH_BATCH
-        #if HAVE_FLOW_DYNAMIC
-            fcb_acquire(batch->count());
-        #endif
-
         // Go back to the head of the queue
         fcb_queue = tmp_queue;
-        output_push_batch(0, batch);
+
+        batch = b.finish();
+        if (batch) {
+#if HAVE_FLOW_DYNAMIC
+            fcb_acquire(batch->count());
+#endif
+            output_push_batch(0, batch);
+        }
+
+        fcb_queue = tmp_queue;        
+
 #else
         batch = b.finish();
         if (batch) {
@@ -361,20 +367,34 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent, int bulk_ret)
     }
 
 #if FLOW_PUSH_BATCH
+
+    if (b.count >= _processing_batch_size){
+        PacketBatch *batch;
+        batch = b.finish();
+        
+        fcb_queue -= b.count;
+        if (batch){
+#if HAVE_FLOW_DYNAMIC
+            fcb_acquire(batch->count());
+#endif
+            output_push_batch(0, batch);
+        }
+
+        b.init();
+    }
+    
+
     (*fcb_queue) = fcb;
     fcb_queue++;
 
-    if (b.last != ret) {
-        if (have_maintainer && _timeout_epochs)
-            update_lastseen(fcb_stack, recent);
+ //   fcb_stack = fcb;
 
-        fcb_stack = fcb;
+    b.append(p);
+    b.last = ret;
+ //   if (have_maintainer && _timeout_epochs)
+ //       update_lastseen(fcb_stack, recent);
 
-        b.last = ret;
-        if (_cache) {
-            b.last_id = fid;
-        }
-    }
+
 #else
     if (b.last == ret) {
         b.append(p);
@@ -509,6 +529,7 @@ protected:
     uint32_t _flow_state_size_full;
     bool _cache;
     bool _bulk_search;
+    uint32_t _processing_batch_size;
     uint32_t _timeout_epochs;
     uint32_t _timeout_ms;          // Timeout for deletion
     uint32_t _epochs_per_sec;      // Granularity for the epoch

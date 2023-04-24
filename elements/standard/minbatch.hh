@@ -35,7 +35,7 @@ class MinBatch: public BatchElement { public:
 
         PacketBatch* last_batch;
         Timer*  timers;
-    };
+    } CLICK_CACHE_ALIGN;
 
     per_thread<State> _state;
 
