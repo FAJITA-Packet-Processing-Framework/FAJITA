@@ -41,7 +41,7 @@ CLICK_DECLS
 	#define FLOW_INDEX(table,index) table.unchecked_at(index)
 #endif
 
-class FlowControlBlock;
+class alignas(CLICK_CACHE_LINE_SIZE) FlowControlBlock;
 class FCBPool;
 class FlowNode;
 class Element;
@@ -104,7 +104,7 @@ struct FlowReleaseChain {
 };
 #endif
 
-class FlowControlBlock {
+class alignas(CLICK_CACHE_LINE_SIZE) FlowControlBlock {
 
 private:
 #if HAVE_FLOW_DYNAMIC
