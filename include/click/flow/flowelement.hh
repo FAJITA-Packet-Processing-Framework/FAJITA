@@ -375,9 +375,6 @@ public :
 
     void push_batch(int port, PacketBatch* head) {
 #if FLOW_PUSH_BATCH
-        FlowControlBlock** tmp_queue = fcb_queue;
-
-
         T** fcbs = new T*[head->count()]; 
         int i = 0;
 
@@ -390,7 +387,7 @@ public :
                 rte_prefetch0((void*)&next_fcb->data[_flow_data_offset]);
             }
 */
-            auto my_fcb = my_fcb_data_from_queue();
+            auto my_fcb = my_fcb_data_from_queue(FLOW_ID_ANNO(p));
             if (!Checker::seen(&my_fcb->v, &my_fcb->str)) {
                 if (likely(static_cast<Derived*>(this)->new_flow(&my_fcb->v, p))) {
                     Checker::mark_seen(&my_fcb->v, &my_fcb->str);
@@ -404,7 +401,7 @@ public :
                     return;
                 }
             }
-            
+
            if(static_cast<Derived*>(this)->is_fcb_large())
                static_cast<Derived*>(this)->prefetch_fcb(0, &my_fcb->v);
            fcbs[i] = &my_fcb->v;
@@ -413,8 +410,6 @@ public :
 
         static_cast<Derived*>(this)->push_flow_batch(port, fcbs, head);
 
-        // Go back to the head of the queue
-        fcb_queue = tmp_queue;
         output_push_batch(0, head);
 #else
          auto my_fcb = my_fcb_data();
@@ -466,8 +461,8 @@ private:
     }
 
 #if FLOW_PUSH_BATCH
-    inline AT* my_fcb_data_from_queue() {
-        auto *fcb = *(fcb_queue++);
+    inline AT* my_fcb_data_from_queue(uint8_t offset) {
+        auto *fcb = *(fcb_queue + offset);
         return static_cast<AT*>((void*)&fcb->data[_flow_data_offset]);
     }
 #endif

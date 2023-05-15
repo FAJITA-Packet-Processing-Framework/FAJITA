@@ -37,6 +37,7 @@ void FlowCounter::push_flow_batch(int port, int** fcb, PacketBatch *head)
     int i = 0;
     FOR_EACH_PACKET_SAFE(head, p) {
         *fcb[i] += 1;
+        i++;
     }
 }
 #endif

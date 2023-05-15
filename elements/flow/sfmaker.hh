@@ -250,6 +250,10 @@ public:
     bool run_task(Task* t) override;
     void push_flow(int port, SFFlow* fcb, PacketBatch*);
 
+#if FLOW_PUSH_BATCH
+    void push_flow_batch(int port, SFFlow** fcb, PacketBatch *head);
+#endif
+
     inline bool new_flow(SFFlow*, Packet*);
     bool stopClassifier() override CLICK_COLD { return _remanage; };
     static const unsigned timeout = 100000;

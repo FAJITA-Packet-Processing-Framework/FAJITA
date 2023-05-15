@@ -233,11 +233,11 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
         BatchBuilder b;
         Timestamp recent;
 
+        uint8_t fcb_idx = 0;
 #if FLOW_PUSH_BATCH
         if (fcb_queue == 0)
-            // TODO: this is statically 64 but it should be the size of the DPDK queue
+            // TODO: this is statically 256 but it should be the size of the DPDK queue
             fcb_queue = new FlowControlBlock*[256];
-        FlowControlBlock** tmp_queue = fcb_queue;
 #endif
 
         FlowControlBlock* tmp = fcb_stack;
@@ -246,27 +246,18 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
 
         if (!_bulk_search){
             FOR_EACH_PACKET_SAFE(batch, p) {
-                ((T*)this)->process(p, b, recent, 0);
+                ((T*)this)->process(p, b, recent, fcb_idx, 0);
             }
         }
         else {
-            ((T*) this)->process_bulk(batch, b, recent);
+            ((T*) this)->process_bulk(batch, b, recent, fcb_idx);
         }
 
 #if FLOW_PUSH_BATCH
-        // Go back to the head of the queue
-        fcb_queue = tmp_queue;
-
-        batch = b.finish();
-        if (batch) {
 #if HAVE_FLOW_DYNAMIC
             fcb_acquire(batch->count());
 #endif
-            output_push_batch(0, batch);
-        }
-
-        fcb_queue = tmp_queue;        
-
+        output_push_batch(0, batch);
 #else
         batch = b.finish();
         if (batch) {
@@ -282,23 +273,24 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
         fcb_stack = tmp;
     }
 
-inline void process_bulk(PacketBatch *batch, BatchBuilder &b, Timestamp &recent) {
+inline void process_bulk(PacketBatch *batch, BatchBuilder &b, Timestamp &recent, uint8_t &fcb_idx) {
     
     int* ret = new int[batch->count()];
     ((T*)this)->find_bulk(batch, ret);
 
     int index = 0;
     FOR_EACH_PACKET_SAFE(batch, pt) {
-        process(pt, b, recent, ret[index]);
+        process(pt, b, recent, fcb_idx, ret[index]);
         index++;
     }
 }
 
-inline void process(Packet *p, BatchBuilder &b, Timestamp &recent, int bulk_ret) {
+inline void process(Packet *p, BatchBuilder &b, Timestamp &recent, uint8_t &fcb_idx, int bulk_ret) {
     IPFlow5ID fid = IPFlow5ID(p);
     FlowControlBlock *fcb;
     auto &state = *_tables;
     int ret;
+    uint8_t curr_idx;
 
     if (bulk_ret != 0){
         ret = bulk_ret;
@@ -306,8 +298,9 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent, int bulk_ret)
     else {
         if (_cache && fid == b.last_id) {
 #if FLOW_PUSH_BATCH
-            (*fcb_queue) = fcb_stack;
-            fcb_queue++;
+            curr_idx = fcb_idx++;
+            SET_FLOW_ID_ANNO(p, curr_idx);
+            *(fcb_queue + curr_idx) = fcb_stack;
 #else
             b.append(p);
 #endif
@@ -367,34 +360,20 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent, int bulk_ret)
     }
 
 #if FLOW_PUSH_BATCH
+    curr_idx = fcb_idx++;
+    SET_FLOW_ID_ANNO(p, curr_idx);
+    *(fcb_queue + curr_idx) = fcb;
+    fcb_stack = fcb;
 
-    if (b.count >= _processing_batch_size){
-        PacketBatch *batch;
-        batch = b.finish();
-        
-        fcb_queue -= b.count;
-        if (batch){
-#if HAVE_FLOW_DYNAMIC
-            fcb_acquire(batch->count());
-#endif
-            output_push_batch(0, batch);
+    if (b.last != ret) {
+        if (have_maintainer && _timeout_epochs)
+            update_lastseen(fcb_stack, recent);
+
+        b.last = ret;
+        if (_cache) {
+            b.last_id = fid;
         }
-
-        b.init();
     }
-    
-
-    (*fcb_queue) = fcb;
-    fcb_queue++;
-
- //   fcb_stack = fcb;
-
-    b.append(p);
-    b.last = ret;
- //   if (have_maintainer && _timeout_epochs)
- //       update_lastseen(fcb_stack, recent);
-
-
 #else
     if (b.last == ret) {
         b.append(p);

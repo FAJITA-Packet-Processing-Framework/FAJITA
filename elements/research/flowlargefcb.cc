@@ -40,11 +40,21 @@ FlowLargeFCB::~FlowLargeFCB() {
 int
 FlowLargeFCB::configure(Vector<String> &conf, ErrorHandler *errh)
 {
+    int size_in_bytes = 0;
+    int size_in_cachelines = 0;
     if (Args(conf, this, errh)
             .read_or_set("SIZE", _size, 1)
             .read_or_set("PREFETCH", _prefetch, 0)
+            .read_or_set("SIZEB", size_in_bytes, 0)
+            .read_or_set("SIZECL", size_in_cachelines, 0)
             .complete() < 0)
         return -1;
+
+    if (size_in_bytes > 0)
+        _size = size_in_bytes / sizeof(int);
+    if (size_in_cachelines > 0)
+        _size = size_in_cachelines * (CLICK_CACHE_LINE_SIZE / sizeof(int));
+
     return 0;
 }
 
@@ -55,20 +65,21 @@ int FlowLargeFCB::initialize(ErrorHandler *errh) {
 
 bool FlowLargeFCB::new_flow(LargeFCBState* flowdata, Packet* p)
 {
-    /*
-    flowdata->iarray = (int *) CLICK_ALIGNED_ALLOC(_size*sizeof(int));
 
+    flowdata->iarray = (int *) CLICK_ALIGNED_ALLOC(_size*sizeof(int));
     bzero(flowdata->iarray,_size * sizeof(int));
-    */
+
     return true;
 }
 
+#if FLOW_PUSH_BATCH
 void FlowLargeFCB::prefetch_fcb(int line_idx, LargeFCBState* flowdata){
     if (!_prefetch)
         return;
 
-//    rte_prefetch0((flowdata->iarray)+(line_idx*64));
-
+    for (int i = 0; i < _size; i+=32){
+        rte_prefetch0((flowdata->iarray)+i);
+    }
 /*
     for (int i = 0; i< ((_size/16)+1) && i < _prefetch; i++){
         rte_prefetch0((flowdata->iarray)+(i*64));
@@ -79,28 +90,36 @@ void FlowLargeFCB::prefetch_fcb(int line_idx, LargeFCBState* flowdata){
 void FlowLargeFCB::push_flow_batch(int, LargeFCBState** flowdata, PacketBatch *head){
     
 
-    int pkt_idx = 0;
     FOR_EACH_PACKET_SAFE(head, p) {
-
+        int *iarray = flowdata[FLOW_ID_ANNO(p)]->iarray;        
         int a = 0;
-        for (int j = 0; j < _size; j++){
-            a += flowdata[pkt_idx]->inplace_array[j];
+        for (int i = 0; i < _size; i+=32){
+            a += iarray[i];
         }
+
         if (a > 10)
-            flowdata[pkt_idx]->inplace_array[0]+=a%10;
-        pkt_idx++;
+            iarray[0]+=a%10;
     }
 
 }
+#endif
 
 void FlowLargeFCB::push_flow(int port, LargeFCBState* flowdata, PacketBatch* batch) {
     int *iarray = flowdata->iarray;
-
-    for (int i = 0; i< 10; i++){
-        iarray[i]++;
-        iarray[i] = iarray[i]%500;
+    int a = 0;
+    if (_size < 10){
+        a += flowdata->inplace_array[0];
     }
-        
+    else {
+        for (int i = 0; i < _size; i+=32){
+            a += iarray[i];
+        }
+    }
+
+    if (a > 10){
+        iarray[0]+=a%10;
+        click_chatter("never should reach here!");        
+    }
     output_push_batch(0, batch);
 }
 

@@ -15,11 +15,11 @@ CLICK_DECLS
 struct LargeFCBState {
 
     LargeFCBState() {
-        bzero(inplace_array, sizeof(int)*50);
+        bzero(inplace_array, sizeof(int)*10);
     }
 
 	int *iarray;
-    int inplace_array [50];
+    int inplace_array [10];
 };
 
 /*

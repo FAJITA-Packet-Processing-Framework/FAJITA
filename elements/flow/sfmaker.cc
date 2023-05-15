@@ -20,6 +20,7 @@
 #include <click/args.hh>
 #include <click/error.hh>
 #include <clicknet/ether.h>
+#include <click/batchbuilder.hh>
 #include "sfmaker.hh"
 #include "../flow/tcpreorder.hh"
 
@@ -759,6 +760,24 @@ start:
     return sent;
 }
 
+#if FLOW_PUSH_BATCH
+void SFMaker::push_flow_batch(int port, SFFlow** fcb, PacketBatch *head) 
+{
+    int i = 0;
+    FlowControlBlock* tmp = fcb_stack;
+
+    FOR_EACH_PACKET_SAFE(head, p) {
+        fcb_stack = *(fcb_queue + i);
+        head = head->pop_front();
+        push_flow(port, fcb[i], PacketBatch::make_from_packet(p));
+
+        i++;
+    }
+    head->kill();
+    fcb_stack = tmp;
+}
+#endif
+
 void SFMaker::push_flow(int, SFFlow* flow, PacketBatch* batch)
 {
 
@@ -810,7 +829,6 @@ void SFMaker::push_flow(int, SFFlow* flow, PacketBatch* batch)
     sf_assert(batch->tail()->next() == 0);
 
     f.last_seen = now;
-
     if (!bypass) {
 
         f.enqueue(batch);
