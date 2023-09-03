@@ -4,6 +4,8 @@
 #include <click/timerwheel.hh>
 #include <click/batchbuilder.hh>
 #include <type_traits>
+#include <clicknet/ether.h>
+
 
 class _FlowManagerIMPState { public:
    //The table of FCBs
@@ -256,7 +258,25 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent) {
     FlowControlBlock *fcb;
     auto &state = *_tables;
 
-    int ret = ((T*)this)->find(fid);
+    int ret = -1;
+    bool cache_found = 0;
+
+    click_ether* e = (click_ether*) p->data();
+    if(e->ether_dhost[2] > 0){
+        ret = 0;
+        ret |= static_cast<uint32_t>(e->ether_dhost[3]) << 16;
+        ret |= static_cast<uint32_t>(e->ether_dhost[4]) << 8;
+        ret |= static_cast<uint32_t>(e->ether_dhost[5]);
+        fcb = get_fcb_from_flowid(ret);
+
+        if (fcb->fid != fid )
+            click_chatter("WRONG FCB INDEX FOUND!");
+        cache_found = 1;
+        goto fcb_fetched;
+//        click_chatter("FCB INDEX RECEIVED: %d", ret);
+    }
+    if (ret == -1)
+        ret = ((T*)this)->find(fid);
 
     if (ret <= 0) { 
         uint32_t flowid;
@@ -284,7 +304,7 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent) {
             return;
         }
         fcb = get_fcb_from_flowid(ret);
-
+        fcb->id = ret;
 
         if constexpr (State::need_fid()) {
             *(get_fcb_flowid(fcb)) = flowid;
@@ -301,6 +321,27 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent) {
         fcb = get_fcb_from_flowid(ret);
     }
 
+    fcb->accessed += 1;
+    if (cache_found == 0 && fcb->getAccessed() >= 2){
+
+        WritablePacket* q =p->uniqueify();
+        p = q;
+                
+        uint32_t extra_data =  (1 << 24) + (ret);
+        uint8_t bytes[6];
+        bytes[2] = static_cast<uint8_t>((extra_data >> 24) & 0xFF);
+        bytes[3] = static_cast<uint8_t>((extra_data >> 16) & 0xFF);
+        bytes[4] = static_cast<uint8_t>((extra_data >> 8) & 0xFF);
+        bytes[5] = static_cast<uint8_t>(extra_data & 0xFF);
+        bytes[0] = 0;
+        bytes[1] = 0;
+
+        click_ether *ethh = reinterpret_cast<click_ether *>(q->data());
+        memcpy(ethh->ether_dhost, bytes, 6);
+    }
+
+
+fcb_fetched:
     if (b.last == ret) {
         b.append(p);
     } else {

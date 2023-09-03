@@ -7,6 +7,8 @@
 #include <click/batchelement.hh>
 #include <click/routervisitor.hh>
 #include <click/pair.hh>
+#include <clicknet/ether.h>
+
 #include "flow.hh"
 
 
@@ -374,21 +376,48 @@ public :
     }
 
     void push_batch(int port, PacketBatch* head) {
-         auto my_fcb = my_fcb_data();
-         if (!Checker::seen(&my_fcb->v, &my_fcb->str)) {
-             if (static_cast<Derived*>(this)->new_flow(&my_fcb->v, head->first())) {
-                 Checker::mark_seen(&my_fcb->v, &my_fcb->str);
-                 if (Derived::timeout > 0)
-                     this->ctx_acquire_timeout(Derived::timeout);
+        auto my_fcb = my_fcb_data();
+        if (!Checker::seen(&my_fcb->v, &my_fcb->str)) {
+            if (static_cast<Derived*>(this)->new_flow(&my_fcb->v, head->first())) {
+                Checker::mark_seen(&my_fcb->v, &my_fcb->str);
+                if (Derived::timeout > 0)
+                    this->ctx_acquire_timeout(Derived::timeout);
 #if HAVE_FLOW_DYNAMIC
-                 this->fcb_set_release_fnt(my_fcb, &release_fnt);
+                this->fcb_set_release_fnt(my_fcb, &release_fnt);
 #endif
-             } else { //TODO set early drop?
-                 head->fast_kill();
-                 return;
-             }
-         }
-         static_cast<Derived*>(this)->push_flow(port, &my_fcb->v, head);
+            } else { //TODO set early drop?
+                head->fast_kill();
+                return;
+            }
+        }
+        /*
+        fcb_stack->accessed += head->count();
+        if (fcb_stack->getAccessed() >= 2){
+            uint32_t fcb_idx = fcb_stack->getId();
+            auto fnt = [this,fcb_idx](Packet*&p) -> bool {
+
+                WritablePacket* q =p->uniqueify();
+                p = q;
+                
+                uint32_t extra_data =  (1 << 24) + (fcb_idx);
+                uint8_t bytes[6];
+                bytes[2] = static_cast<uint8_t>((extra_data >> 24) & 0xFF);
+                bytes[3] = static_cast<uint8_t>((extra_data >> 16) & 0xFF);
+                bytes[4] = static_cast<uint8_t>((extra_data >> 8) & 0xFF);
+                bytes[5] = static_cast<uint8_t>(extra_data & 0xFF);
+                bytes[0] = 0;
+                bytes[1] = 0;
+
+                click_ether *ethh = reinterpret_cast<click_ether *>(q->data());
+                memcpy(ethh->ether_dhost, bytes, 6);
+
+                return true;
+            };
+            EXECUTE_FOR_EACH_PACKET_UNTIL_DROP(fnt, head);
+
+        }
+        */
+        static_cast<Derived*>(this)->push_flow(port, &my_fcb->v, head);
     };
 
     void close_flow() {

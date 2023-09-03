@@ -119,6 +119,9 @@ private:
 #if DEBUG_CLASSIFIER
 		int thread = -1;
 #endif
+        IPFlow5ID fid;
+        uint32_t accessed = 0;
+        uint32_t id = 0;
         Timestamp lastseen; //Last seen is also used without sloppy timeout for cache purposes
 
 #if HAVE_CTX_GLOBAL_TIMEOUT
@@ -222,6 +225,12 @@ private:
 			return 0;
 		}
 #endif
+        inline uint32_t getAccessed(){
+            return accessed;
+        }
+        inline uint32_t getId() {
+            return id;
+        }
 		FlowControlBlock* duplicate(unsigned use_count);
         inline FCBPool* get_pool() const;
 
