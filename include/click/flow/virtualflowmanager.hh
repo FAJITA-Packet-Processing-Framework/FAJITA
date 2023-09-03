@@ -14,6 +14,8 @@ class _FlowManagerIMPState { public:
     int _failed_searches = 0;
     int _successful_searches = 0;
 
+    const void **key_array2 = new const void*[256];
+
     void **key_array = new void*[256];
     IPFlow5ID* flowIDs = new IPFlow5ID[256];
 };
@@ -87,6 +89,7 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
 
     int solve_initialize(ErrorHandler *errh) override
     {        
+        lookup_ret = 0;
         auto passing = get_passing_threads();
         int table_count = passing.size();
         _capacity = next_pow2(_capacity/passing.weight());
@@ -230,6 +233,7 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
     }
 
     void push_batch(int, PacketBatch *batch) override {
+        
         BatchBuilder b;
         Timestamp recent;
 
@@ -246,10 +250,14 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
 
         if (!_bulk_search){
             FOR_EACH_PACKET_SAFE(batch, p) {
-                ((T*)this)->process(p, b, recent, fcb_idx, 0);
+                ((T*)this)->process(p, b, recent, fcb_idx, -10);
             }
         }
         else {
+            // for(Packet* pkt = batch->first();pkt != 0;pkt=pkt->next()){
+            //     rte_prefetch0(pkt->ip_header());
+            //     rte_prefetch0(pkt->udp_header());                
+            // }
             ((T*) this)->process_bulk(batch, b, recent, fcb_idx);
         }
 
@@ -271,31 +279,35 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
 #endif
 
         fcb_stack = tmp;
+
     }
 
 inline void process_bulk(PacketBatch *batch, BatchBuilder &b, Timestamp &recent, uint8_t &fcb_idx) {
     
-    int* ret = new int[batch->count()];
-    ((T*)this)->find_bulk(batch, ret);
+    if (lookup_ret == 0){
+        lookup_ret = new int[256];
+        for (int i = 0; i< 256; i++){
+            lookup_ret[i] = -1;
+        }
+    }
+    
+    ((T*)this)->find_bulk(batch, lookup_ret);
 
     int index = 0;
     FOR_EACH_PACKET_SAFE(batch, pt) {
-        process(pt, b, recent, fcb_idx, ret[index]);
+        process(pt, b, recent, fcb_idx, lookup_ret[index]);
         index++;
     }
 }
 
-inline void process(Packet *p, BatchBuilder &b, Timestamp &recent, uint8_t &fcb_idx, int bulk_ret) {
-    IPFlow5ID fid = IPFlow5ID(p);
+inline void process(Packet *p, BatchBuilder &b, Timestamp &recent, uint8_t &fcb_idx, int ret) {
+//    IPFlow5ID fid = IPFlow5ID(p);
+    IPFlow5ID fid;
     FlowControlBlock *fcb;
     auto &state = *_tables;
-    int ret;
     uint8_t curr_idx;
 
-    if (bulk_ret != 0){
-        ret = bulk_ret;
-    }
-    else {
+    if (ret == -10) {
         if (_cache && fid == b.last_id) {
 #if FLOW_PUSH_BATCH
             curr_idx = fcb_idx++;
@@ -306,6 +318,7 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent, uint8_t &fcb_
 #endif
             return;
         }
+        fid = IPFlow5ID(p);
         ret = ((T*)this)->find(fid);
     }
 
@@ -325,11 +338,11 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent, uint8_t &fcb_
 
             // INSERT IN TABLE
 
-            ret = ((T*)this)->insert(fid, flowid);
+            ret = ((T*)this)->insert2(p, flowid);
 
         } else {
 
-            ret = ((T*)this)->insert(fid, 0);
+            ret = ((T*)this)->insert2(p, 0);
 
             flowid = ret;
         }
@@ -502,6 +515,7 @@ protected:
         add_read_handler("successful_searches", read_handler, h_successful_searches);
     }
 
+    int* lookup_ret;
     per_thread_oread<State> _tables;
     uint32_t _capacity;
     int _verbose;

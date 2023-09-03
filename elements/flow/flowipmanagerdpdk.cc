@@ -52,8 +52,9 @@ FlowIPManager_DPDK::alloc(FlowIPManager_DPDKState & table, int core, ErrorHandle
     hash_params.name = buf;
     hash_params.entries = _capacity;
 
-    hash_params.key_len = sizeof(IPFlow5ID);
-    hash_params.hash_func = ipv4_hash_crc;
+//    hash_params.key_len = sizeof(IPFlow5ID);
+    hash_params.key_len = sizeof(uint32_t);
+    hash_params.hash_func = ipv4_hash_crc2;
     hash_params.hash_func_init_val = 0;
     hash_params.extra_flag = 0;
 
@@ -69,13 +70,14 @@ FlowIPManager_DPDK::find_bulk(PacketBatch *batch, int* positions)
 {   
     int index = 0;
     FOR_EACH_PACKET(batch, p){
-        _tables->flowIDs[index] = IPFlow5ID(p);
-        _tables->key_array[index] = &(_tables->flowIDs[index]);
+//        _tables->flowIDs[index] = IPFlow5ID(p);
+//        _tables->key_array[index] = &(_tables->flowIDs[index]);
+        _tables->key_array2[index] = p->anno_u32_ptr(20);
         index++;
     }
 
     auto *table = reinterpret_cast<rte_hash*>(_tables->hash);
-    rte_hash_lookup_bulk(table, const_cast<const void **>(&(_tables->key_array[0])), batch->count(), positions);
+    rte_hash_lookup_bulk(table, &(_tables->key_array2[0]), batch->count(), positions);
 }
 
 int
@@ -106,6 +108,16 @@ FlowIPManager_DPDK::insert(IPFlow5ID &f, int)
 {
     auto *table = reinterpret_cast<rte_hash *> (_tables->hash);
     int ret = rte_hash_add_key(table, &f);
+
+    return ret;
+}
+
+int
+FlowIPManager_DPDK::insert2(Packet *p, int)
+{
+    auto *table = reinterpret_cast<rte_hash *> (_tables->hash);
+    uint32_t key = AGGREGATE_ANNO(p);
+    int ret = rte_hash_add_key(table, &key);
 
     return ret;
 }

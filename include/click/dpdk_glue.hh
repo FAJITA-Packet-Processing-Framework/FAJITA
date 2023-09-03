@@ -5,6 +5,7 @@
 #include <rte_hash_crc.h>
 #include <click/ipflowid.hh>
 
+
 #if RTE_VERSION >= RTE_VERSION_NUM(22,07,0,0)
 #define PKT_RX_TIMESTAMP RTE_MBUF_F_RX_TIMESTAMP
 #endif
@@ -25,6 +26,41 @@ ipv4_hash_crc(const void *data,  uint32_t data_len,
     init_val = rte_hash_crc_4byte(k->daddr(), init_val);
     init_val = rte_hash_crc_4byte(*p, init_val);
     return init_val;
+}
+
+inline uint32_t
+ipv4_hash_crc3(IPFlow5ID *data,  uint32_t data_len,
+                uint32_t init_val)
+{
+    (void)data_len;
+    IPFlow5ID *k;
+    uint32_t t;
+    const uint32_t *p;
+    k = data;
+    t = k->proto();
+    p = ((const uint32_t *)k) + 2;
+//    init_val = rte_hash_crc_4byte(t, init_val);
+    uint32_t src_short = ((k->saddr() << 16) >> 16);
+    init_val = rte_hash_crc_4byte(k->saddr(), init_val);
+    init_val = rte_hash_crc_4byte(k->daddr(), init_val);
+    init_val = rte_hash_crc_4byte(*p, init_val);
+    return (init_val << 16 | src_short);
+//    return init_val;
+}
+
+inline uint32_t
+ipv4_hash_crc4(const void *data,  uint32_t data_len,
+                uint32_t init_val)
+{
+    return rte_hash_crc(data, data_len, init_val);
+}
+
+
+inline uint32_t
+ipv4_hash_crc2(const void *data,  uint32_t data_len,
+                uint32_t init_val)
+{
+    return *(const uint32_t *)data;
 }
 
 #if RTE_VERSION <= RTE_VERSION_NUM(2,2,0,0)

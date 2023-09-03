@@ -56,11 +56,22 @@ FlowIPManager_CuckooPP::alloc(FlowIPManager_CuckooPPState & table, int core, Err
 void
 FlowIPManager_CuckooPP::find_bulk(PacketBatch *batch, int32_t* positions)
 {
-    auto *table = 	reinterpret_cast<rte_hash*>(_tables->hash);
+    auto *table = 	reinterpret_cast<rte_hash_hvariant *>(_tables->hash);
 
-    for (int i = 0; i< batch->count(); i++){
-        positions[i] = 0;
+    uint64_t hit_mask = 0;
+    hash_data_t *data = new hash_data_t[batch->count()];
+    hash_key_t *keys = new hash_key_t[batch->count()];
+    int i = 0;
+    FOR_EACH_PACKET(batch, p){
+//        hash_key_t key = {0};
+        keys[i] = {0};
+        keys[i].a = ((uint64_t) p->anno_u32(20) << 32) | ((uint64_t)p->anno_u32(20));
+        keys[i].b = ((uint64_t) p->anno_u32(20) << 32) | ((uint64_t)p->anno_u32(20));
+        i++;
     }  
+
+
+    rte_hash_bloom_lookup_bulk_data(table, keys, (uint32_t) batch->count(), &hit_mask, data, 0);
 }
 
 int
@@ -98,6 +109,22 @@ FlowIPManager_CuckooPP::insert(IPFlow5ID &f, int flowid)
     hash_key_t key = {0};
     key.a = ((uint64_t) f.saddr().addr() << 32) | ((uint64_t)f.daddr().addr());
     key.b = ((uint64_t) f.proto() << 32) | ((uint64_t)f.sport() << 16) | ((uint64_t)f.dport());
+
+    hash_data_t data = {0};
+
+    data.a = flowid;
+    int ret = rte_hash_bloom_add_key_data(table, key, data, 0, 0);
+
+    return ret >= 0? flowid : -1;
+}
+
+int
+FlowIPManager_CuckooPP::insert2(Packet *p, int flowid)
+{
+    auto *table = reinterpret_cast<rte_hash_hvariant *> (_tables->hash);
+    hash_key_t key = {0};
+    key.a = ((uint64_t) p->anno_u32(20) << 32) | ((uint64_t)p->anno_u32(20));
+    key.b = ((uint64_t) p->anno_u32(20) << 32) | ((uint64_t)p->anno_u32(20));
 
     hash_data_t data = {0};
 

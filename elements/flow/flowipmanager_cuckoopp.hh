@@ -36,6 +36,7 @@ protected:
 	inline void find_bulk(PacketBatch *batch, int32_t* positions);
     inline int find(IPFlow5ID &f);
 	inline int insert(IPFlow5ID &f, int flowid);
+    inline int insert2(Packet *p, int);
     inline int remove(IPFlow5ID &f);
     inline int count();
     
