@@ -4,6 +4,8 @@
 #include <click/timerwheel.hh>
 #include <click/batchbuilder.hh>
 #include <type_traits>
+#include <clicknet/ether.h>
+
 
 class _FlowManagerIMPState { public:
    //The table of FCBs
@@ -16,6 +18,8 @@ class _FlowManagerIMPState { public:
 
     void **key_array = new void*[256];
     IPFlow5ID* flowIDs = new IPFlow5ID[256];
+    int** rets = new int*[256];
+
 };
 
 class FlowManagerIMPStateNoFID : public _FlowManagerIMPState { public:
@@ -70,7 +74,7 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
                 .read_or_set("RESERVE", _reserve, 0)
                 .read_or_set("VERBOSE", _verbose, 0)
                 .read_or_set("CACHE", _cache, 1)
-                .read_or_set("BULK_SEARCH", _bulk_search, 0)
+                .read_or_set("EXTERNAL_CACHE", _external_cache, 0)
                 .read_or_set("TIMEOUT", timeout, 0) // Timeout for the entries
                 .read_or_set("RECYCLE_INTERVAL", recycle_interval, 1)
                 .read_or_set("PROCESS_BATCH", _processing_batch_size, 256)
@@ -244,14 +248,13 @@ class VirtualFlowManagerIMP : public VirtualFlowManager, public Router::InitFutu
         if (have_maintainer)
             recent = Timestamp::recent_steady();
 
-        if (!_bulk_search){
-            FOR_EACH_PACKET_SAFE(batch, p) {
-                ((T*)this)->process(p, b, recent, fcb_idx, 0);
-            }
+#if FLOW_BULK_SEARCH
+        ((T*) this)->process_bulk(batch, b, recent, fcb_idx);
+#else
+        FOR_EACH_PACKET_SAFE(batch, p) {
+            ((T*)this)->process(p, b, recent, fcb_idx, 0);
         }
-        else {
-            ((T*) this)->process_bulk(batch, b, recent, fcb_idx);
-        }
+#endif
 
 #if FLOW_PUSH_BATCH
 #if HAVE_FLOW_DYNAMIC
@@ -292,10 +295,9 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent, uint8_t &fcb_
     int ret;
     uint8_t curr_idx;
 
-    if (bulk_ret != 0){
+#if FLOW_BULK_SEARCH
         ret = bulk_ret;
-    }
-    else {
+#else
         if (_cache && fid == b.last_id) {
 #if FLOW_PUSH_BATCH
             curr_idx = fcb_idx++;
@@ -307,10 +309,38 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent, uint8_t &fcb_
             return;
         }
         ret = ((T*)this)->find(fid);
+#endif
+    
+    if (likely(ret >= 0) ){
+        if (_verbose)
+            _tables->_successful_searches += 1;
+
+        fcb = get_fcb_from_flowid(ret);
+
+        if (_external_cache){
+//        if (fcb->pkt_count <= 1)
+//            fcb->pkt_count++;
+//        else {
+            WritablePacket* q =p->uniqueify();
+            p = q;
+                
+            uint32_t extra_data =  (1 << 24) + (ret);
+            uint8_t bytes[6];
+            bytes[2] = static_cast<uint8_t>((extra_data >> 24) & 0xFF);
+            bytes[3] = static_cast<uint8_t>((extra_data >> 16) & 0xFF);
+            bytes[4] = static_cast<uint8_t>((extra_data >> 8) & 0xFF);
+            bytes[5] = static_cast<uint8_t>(extra_data & 0xFF);
+            bytes[0] = 0;
+            bytes[1] = 0;
+
+            click_ether* e = (click_ether*) p->data();
+
+            memcpy(e->ether_dhost, bytes, 6);
+//        }
+        }
+
     }
-
-
-    if (ret < 0) {
+    else {
         if (_verbose)
             _tables->_failed_searches += 1;
 
@@ -340,6 +370,8 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent, uint8_t &fcb_
         }
         fcb = get_fcb_from_flowid(ret);
 
+        fcb->fcb_idx = ret;
+
 
         if constexpr (State::need_fid()) {
             *(get_fcb_flowid(fcb)) = flowid;
@@ -351,13 +383,6 @@ inline void process(Packet *p, BatchBuilder &b, Timestamp &recent, uint8_t &fcb_
         }
 
     } // (end)It's a new flow
-    else
-    { // Old flow
-        if (_verbose)
-            _tables->_successful_searches += 1;
-
-        fcb = get_fcb_from_flowid(ret);
-    }
 
 #if FLOW_PUSH_BATCH
     curr_idx = fcb_idx++;
@@ -507,7 +532,7 @@ protected:
     int _verbose;
     uint32_t _flow_state_size_full;
     bool _cache;
-    bool _bulk_search;
+    bool _external_cache;
     uint32_t _processing_batch_size;
     uint32_t _timeout_epochs;
     uint32_t _timeout_ms;          // Timeout for deletion

@@ -28,7 +28,7 @@ int FlowIPManager_DPDK::configure(Vector<String> &conf, ErrorHandler *errh) {
     Args args(conf, this, errh);
 
     if (parse(&args) || args
-                .read_or_set("VERBOSE", _verbose, true)
+                .read_or_set("VERBOSE", _verbose, false)
                 .complete())
         return errh->error("Error while parsing arguments!");
 
@@ -55,7 +55,7 @@ FlowIPManager_DPDK::alloc(FlowIPManager_DPDKState & table, int core, ErrorHandle
     hash_params.key_len = sizeof(IPFlow5ID);
     hash_params.hash_func = ipv4_hash_crc;
     hash_params.hash_func_init_val = 0;
-    hash_params.extra_flag = 0;
+    hash_params.extra_flag = 0x20;
 
     sprintf(buf, "%d-%s",core ,name().c_str());
     table.hash = rte_hash_create(&hash_params);
@@ -68,14 +68,38 @@ void
 FlowIPManager_DPDK::find_bulk(PacketBatch *batch, int* positions)
 {   
     int index = 0;
+    int notCachedIndex = 0;
+//    int** ret = new int*[batch->count()];
+
     FOR_EACH_PACKET(batch, p){
-        _tables->flowIDs[index] = IPFlow5ID(p);
-        _tables->key_array[index] = &(_tables->flowIDs[index]);
+        if (_external_cache){
+            click_ether* e = (click_ether*) p->data();
+            if(e->ether_dhost[2] > 0){
+                positions[index] = 0;
+                positions[index] |= static_cast<uint32_t>(e->ether_dhost[3]) << 16;
+                positions[index] |= static_cast<uint32_t>(e->ether_dhost[4]) << 8;
+                positions[index] |= static_cast<uint32_t>(e->ether_dhost[5]);
+            }
+            else{
+                _tables->rets[notCachedIndex] = &(positions[index]);
+                _tables->key_array[notCachedIndex] = &(_tables->flowIDs[index]);
+                notCachedIndex++;
+            }
+        }
+        else{
+            _tables->flowIDs[index] = IPFlow5ID(p);
+            _tables->key_array[index] = &(_tables->flowIDs[index]);
+            _tables->rets[notCachedIndex] = &(positions[index]);
+            notCachedIndex++;
+        }
         index++;
     }
 
-    auto *table = reinterpret_cast<rte_hash*>(_tables->hash);
-    rte_hash_lookup_bulk(table, const_cast<const void **>(&(_tables->key_array[0])), batch->count(), positions);
+    if (notCachedIndex > 0){
+        
+        auto *table = reinterpret_cast<rte_hash*>(_tables->hash);
+        rte_hash_lookup_bulk(table, const_cast<const void **>(&(_tables->key_array[0])), notCachedIndex, _tables->rets);
+    }
 }
 
 int

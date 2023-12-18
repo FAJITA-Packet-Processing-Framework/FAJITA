@@ -120,6 +120,8 @@ private:
 		int thread = -1;
 #endif
         Timestamp lastseen; //Last seen is also used without sloppy timeout for cache purposes
+        uint16_t pkt_count;
+        uint32_t fcb_idx;
 
 #if HAVE_CTX_GLOBAL_TIMEOUT
         /**
@@ -266,6 +268,7 @@ class FlowTableHolder;
 
 // TODO: move in configure
 #define FLOW_PUSH_BATCH 1
+#define FLOW_BULK_SEARCH 1
 
 extern __thread FlowControlBlock* fcb_stack;
 #if FLOW_PUSH_BATCH

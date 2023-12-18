@@ -27,6 +27,15 @@ ipv4_hash_crc(const void *data,  uint32_t data_len,
     return init_val;
 }
 
+inline uint32_t
+ipv4_hash_crc_src_ip(const void *data,  uint32_t data_len,
+                uint32_t init_val)
+{
+    const uint32_t *srcIP = static_cast<const uint32_t*>(data);    
+    return rte_hash_crc_4byte(*srcIP, init_val);
+}
+
+
 #if RTE_VERSION <= RTE_VERSION_NUM(2,2,0,0)
 static inline int rte_ring_mc_dequeue_bulk(struct rte_ring *r, void **obj_table, unsigned n, void *) {
     rte_ring_mc_dequeue_bulk(r, obj_table,n);

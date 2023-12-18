@@ -2544,7 +2544,7 @@ Router::configuration_string() const
     }
 }
 
-enum { GH_VERSION, GH_CONFIG, GH_FLATCONFIG, GH_LIST, GH_LOAD, GH_LOAD_CYCLES, GH_USEFUL_CYCLES, GH_REQUIREMENTS,
+enum { GH_VERSION, GH_CONFIG, GH_FLATCONFIG, GH_LIST, GH_LOAD, GH_IMBALANCE, GH_LOAD_CYCLES, GH_USEFUL_CYCLES, GH_REQUIREMENTS,
        GH_DRIVER, GH_ACTIVE_PORTS, GH_ACTIVE_PORT_STATS, GH_STRING_PROFILE,
        GH_STRING_PROFILE_LONG, GH_SCHEDULING_PROFILE, GH_STOP,
        GH_ELEMENT_CYCLES, GH_CLASS_CYCLES, GH_RESET_CYCLES };
@@ -2568,6 +2568,7 @@ Router::router_handler(int operation, String &data, Element *e,
       case GH_LOAD:
       case GH_LOAD_CYCLES:
       case GH_USEFUL_CYCLES:
+      case GH_IMBALANCE:
           {
         int index;
         IntArg arg;
@@ -2575,6 +2576,19 @@ Router::router_handler(int operation, String &data, Element *e,
             sa << r->master()->thread(index)->load();
         } else {
             int n = r->master()->nthreads();
+            if (opt == GH_IMBALANCE) {
+                float min = 1.0;
+                float max = 0.0;
+                for (int i = 0; i < n; i++) {
+                    float l = r->master()->thread(i)->load();
+                    if (l < min)
+                        min = l;
+                    if (l > max)
+                        max = l;
+                }
+                sa << String(max/min);
+                break;
+            }
             for (int i = 0; i < n; i++) {
                 if (opt == GH_LOAD) {
                     float l = r->master()->thread(i)->load();
@@ -2822,6 +2836,7 @@ Router::static_initialize()
         add_read_handler(0, "list", router_read_handler, (void *)GH_LIST);
 #if HAVE_CLICK_LOAD
         set_handler(0, "load", Handler::h_read | Handler::f_read_param, router_handler, (void *)GH_LOAD, (void *)0);
+        set_handler(0, "load_imbalance", Handler::h_read | Handler::f_read_param, router_handler, (void *)GH_IMBALANCE, (void *)0);
         set_handler(0, "load_cycles", Handler::h_read | Handler::f_read_param, router_handler, (void *)GH_LOAD_CYCLES, (void *)0);
         set_handler(0, "useful_kcycles", Handler::h_read | Handler::f_read_param, router_handler, (void *)GH_USEFUL_CYCLES, (void *)0);
 #endif
