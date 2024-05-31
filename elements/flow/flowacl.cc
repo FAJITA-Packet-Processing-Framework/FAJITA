@@ -31,7 +31,7 @@ void FlowACL::push_flow(int, int* fcb, PacketBatch* flow)
 }
 
 #if FLOW_PUSH_BATCH
-void FlowACL::push_flow_batch(int port, int** fcb, PacketBatch *head) 
+inline void FlowACL::push_flow_batch(int port, int** fcb, PacketBatch *head) 
 {
 }
 #endif

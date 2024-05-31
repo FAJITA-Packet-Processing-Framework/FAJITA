@@ -251,7 +251,7 @@ public:
     void push_flow(int port, SFFlow* fcb, PacketBatch*);
 
 #if FLOW_PUSH_BATCH
-    void push_flow_batch(int port, SFFlow** fcb, PacketBatch *head);
+    inline void push_flow_batch(int port, SFFlow** fcb, PacketBatch *head);
 #endif
 
     inline bool new_flow(SFFlow*, Packet*);

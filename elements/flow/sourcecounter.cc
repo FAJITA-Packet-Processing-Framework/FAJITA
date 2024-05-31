@@ -74,7 +74,7 @@ void SourceCounter::push_flow(int, int* fcb, PacketBatch* flow)
 }
 
 #if FLOW_PUSH_BATCH
-void SourceCounter::push_flow_batch(int port, int** fcb, PacketBatch *head) 
+inline void SourceCounter::push_flow_batch(int port, int** fcb, PacketBatch *head) 
 {
     if (!_cache){
         int *positions = new int[head->count()];

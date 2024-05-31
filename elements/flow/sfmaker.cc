@@ -761,7 +761,7 @@ start:
 }
 
 #if FLOW_PUSH_BATCH
-void SFMaker::push_flow_batch(int port, SFFlow** fcb, PacketBatch *head) 
+inline void SFMaker::push_flow_batch(int port, SFFlow** fcb, PacketBatch *head) 
 {
     int i = 0;
     FlowControlBlock* tmp = fcb_stack;

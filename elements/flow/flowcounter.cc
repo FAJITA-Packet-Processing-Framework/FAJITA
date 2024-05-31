@@ -32,7 +32,7 @@ void FlowCounter::push_flow(int, int* fcb, PacketBatch* flow)
 }
 
 #if FLOW_PUSH_BATCH
-void FlowCounter::push_flow_batch(int port, int** fcb, PacketBatch *head) 
+inline void FlowCounter::push_flow_batch(int port, int** fcb, PacketBatch *head) 
 {
     int i = 0;
     FOR_EACH_PACKET_SAFE(head, p) {

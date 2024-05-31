@@ -375,20 +375,28 @@ public :
 
     void push_batch(int port, PacketBatch* head) {
 #if FLOW_PUSH_BATCH
-        T** fcbs = new T*[head->count()]; 
+        int count = head->count();
+
+        const int MAX_PACKETS = 64;
+        T* fcbs[MAX_PACKETS];
+
+//        T** fcbs = new T*[count]; 
         int i = 0;
 
         int idx = 0;
         Packet* p = head->first();
         Packet* fep_next = ((p != 0)? p->next() : 0 );
-        for (;p != 0;idx++,p=fep_next,fep_next=(p==0?0:p->next())) {
-/*            if (idx < (head->count() - 2)){
-                auto *next_fcb = *(fcb_queue+2);
-                rte_prefetch0((void*)&next_fcb->data[_flow_data_offset]);
-            }
-*/
+        Packet* fep_two_ahead = (fep_next != 0 ? fep_next->next() : 0); // Second packet ahead of the current packet
+
+        for (;p != 0;idx++,p=fep_next,fep_next=(p==0?0:p->next()), fep_two_ahead = (fep_next == 0 ? 0 : fep_next->next())) {
+//            if (fep_two_ahead != 0) {
+//                auto next_fcb = my_fcb_data_from_queue(idx+2);
+//                rte_prefetch0(next_fcb);
+//            }
+
             auto my_fcb = my_fcb_data_from_queue(FLOW_ID_ANNO(p));
             if (!Checker::seen(&my_fcb->v, &my_fcb->str)) {
+
                 if (likely(static_cast<Derived*>(this)->new_flow(&my_fcb->v, p))) {
                     Checker::mark_seen(&my_fcb->v, &my_fcb->str);
                     if (Derived::timeout > 0)
@@ -400,6 +408,7 @@ public :
                     head->fast_kill();
                     return;
                 }
+                
             }
 
            if(static_cast<Derived*>(this)->is_fcb_large())
@@ -442,7 +451,7 @@ public :
 
 #if FLOW_PUSH_BATCH
     /* TODO: This should be virtual and implemented by each element, for now let's put an empty body for testing */
-    void push_flow_batch(int port, T** flowdata, PacketBatch *head) {
+    inline void push_flow_batch(int port, T** flowdata, PacketBatch *head) {
 
     }
     void prefetch_fcb(int, T*) {

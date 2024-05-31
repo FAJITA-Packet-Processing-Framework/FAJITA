@@ -109,7 +109,7 @@ void FlowIPLoadBalancer::push_flow(int, IPLBEntry* flowdata, PacketBatch* batch)
 }
 
 #if FLOW_PUSH_BATCH
-void FlowIPLoadBalancer::push_flow_batch(int, IPLBEntry** flowdata, PacketBatch *head)
+inline void FlowIPLoadBalancer::push_flow_batch(int, IPLBEntry** flowdata, PacketBatch *head)
 {
     int i = 0;
     FOR_EACH_PACKET_SAFE(head, p) {
