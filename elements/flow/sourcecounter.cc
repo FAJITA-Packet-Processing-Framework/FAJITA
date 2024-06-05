@@ -41,7 +41,7 @@ int SourceCounter::configure(Vector<String> &conf, ErrorHandler *errh)
     hash_params.key_len = sizeof(local_flowID);
     hash_params.hash_func = ipv4_hash_crc_src_ip;
     hash_params.hash_func_init_val = 0;
-    hash_params.extra_flag = 0;
+    hash_params.extra_flag = RTE_HASH_EXTRA_FLAGS_RW_CONCURRENCY | RTE_HASH_EXTRA_FLAGS_MULTI_WRITER_ADD;
 
 //    sprintf(buf, "Shared-Data-Structure-%d-%s",0 ,name().c_str());
     _table = rte_hash_create(&hash_params);
