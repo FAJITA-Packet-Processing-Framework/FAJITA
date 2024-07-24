@@ -18,7 +18,6 @@ class _FlowManagerIMPState { public:
 
     void **key_array = new void*[256];
     IPFlow5ID* flowIDs = new IPFlow5ID[256];
-    int** rets = new int*[256];
 
 };
 

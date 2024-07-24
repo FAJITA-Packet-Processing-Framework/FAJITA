@@ -68,38 +68,15 @@ void
 FlowIPManager_DPDK::find_bulk(PacketBatch *batch, int* positions)
 {   
     int index = 0;
-    int notCachedIndex = 0;
-//    int** ret = new int*[batch->count()];
 
     FOR_EACH_PACKET(batch, p){
-        if (_external_cache){
-            click_ether* e = (click_ether*) p->data();
-            if(e->ether_dhost[2] > 0){
-                positions[index] = 0;
-                positions[index] |= static_cast<uint32_t>(e->ether_dhost[3]) << 16;
-                positions[index] |= static_cast<uint32_t>(e->ether_dhost[4]) << 8;
-                positions[index] |= static_cast<uint32_t>(e->ether_dhost[5]);
-            }
-            else{
-                _tables->rets[notCachedIndex] = &(positions[index]);
-                _tables->key_array[notCachedIndex] = &(_tables->flowIDs[index]);
-                notCachedIndex++;
-            }
-        }
-        else{
-            _tables->flowIDs[index] = IPFlow5ID(p);
-            _tables->key_array[index] = &(_tables->flowIDs[index]);
-            _tables->rets[notCachedIndex] = &(positions[index]);
-            notCachedIndex++;
-        }
+        _tables->flowIDs[index] = IPFlow5ID(p);
+        _tables->key_array[index] = &(_tables->flowIDs[index]);
         index++;
     }
 
-    if (notCachedIndex > 0){
-        
-        auto *table = reinterpret_cast<rte_hash*>(_tables->hash);
-        rte_hash_lookup_bulk(table, const_cast<const void **>(&(_tables->key_array[0])), notCachedIndex, _tables->rets);
-    }
+    auto *table = reinterpret_cast<rte_hash*>(_tables->hash);
+    rte_hash_lookup_bulk(table, const_cast<const void **>(&(_tables->key_array[0])), index, positions);
 }
 
 int

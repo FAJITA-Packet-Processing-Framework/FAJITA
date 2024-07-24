@@ -78,17 +78,15 @@ inline void SourceCounter::push_flow_batch(int port, int** fcb, PacketBatch *hea
 {
     if (!_cache){
         int *positions = new int[head->count()];
-        int **ret = new int*[head->count()];
         int index = 0;
         void **key_array = new void*[64];
         FOR_EACH_PACKET(head, p){
             key_array[index] = (local_flowID*) (p->data() + _offset);
-            ret[index] = &(positions[index]);
             index++;
         }
 
         auto *table = reinterpret_cast<rte_hash *> (_table);
-        rte_hash_lookup_bulk(table, const_cast<const void **>(&(key_array[0])), head->count(), ret);
+        rte_hash_lookup_bulk(table, const_cast<const void **>(&(key_array[0])), head->count(), positions);
 
         int i = 0;
         FOR_EACH_PACKET_SAFE(head, pkt) {
